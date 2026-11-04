@@ -21,7 +21,7 @@ exploration — дата установки: 2026-11-04
 | Фаза | Описание | Статус | Дата |
 |---|---|---|---|
 | 0 | Протокольный spike: режим passthrough/unified, upstream-auth capture, модельные ID, живой fallback | DONE (Kimi-пробы — до отпущения лимита, оговорка в impl-сессии 261104-01) | 2026-11-04 |
-| 1 | Core-стек локально: compose-артефакт, UI-настройка моделей/ключей, virtual key, gates (restart, YAML↔DB связка, discovery, auto mode) | IN PROGRESS (артефакт + тесты готовы, ревью пройдено; живые gates — впереди) | 2026-11-04 — |
+| 1 | Core-стек локально: compose-артефакт, UI-настройка моделей/ключей, virtual key, gates (restart, YAML↔DB связка, discovery, auto mode) | DONE (все gates живьём: 4 модели + VK через UI/API; restart-персистентность; fallback top→optimal при индуцированном 401; scope VK 403; связка YAML↔DB; CC через шлюз «pong» + beta-запросы 200. Оговорки: auto mode и discovery-пикер — живой CC-сессией в эксплуатации/фазе 3; Kimi ID `k3.1-pro` подтверждён после отпущения окна) | 2026-11-04 |
 | 2 | Деплой под governetics (upstream+route, Preview → узел → Deploy → `converged`), remote smoke через HTTPS. **Gate до Deploy:** живой прогон `tests/test_platform_parser.py` с `GOVERNETICS_ROOT` — панельные гейты (env_precedence, bind_mounts, tag-pattern на оба семейства тегов) локальным прогоном не покрыты (skip без checkout'а). Решение оператора 2026-11-04: держать здесь, не в backlog | TODO | |
 | 3 | Приёмка (CC-сессии через оба контура, индуцированный fallback), hardening (DB-admin, disable_env_credential_login, admin_only), доки (README-оператор, architecture.md, ADR D-001/D-002, release-config) | TODO | |
 
