@@ -8,6 +8,9 @@ secrets/
 .env.*
 !.env.example
 
+# Database dumps carry encrypted provider credentials.
+backups/
+
 # macOS noise.
 .DS_Store
 

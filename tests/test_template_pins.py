@@ -257,7 +257,8 @@ def test_gitignore_pins_secret_paths():
     """The VCS half of A3, as a behavioural probe: git itself must keep
     swallowing secret paths. A dropped .env line turns this red instead of
     letting the next local .env leak into a commit."""
-    ignored = (".env", "secrets/providers/kimi-coding.key", "x.key", "x.pem")
+    ignored = (".env", "secrets/providers/kimi-coding.key", "x.key", "x.pem",
+               "backups/llm-gate-20260101-000000.sql.gz")
     for path in ignored:
         r = subprocess.run(["git", "check-ignore", "--", path], cwd=ROOT,
                            capture_output=True, text=True)
