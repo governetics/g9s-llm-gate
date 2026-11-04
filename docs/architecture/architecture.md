@@ -66,10 +66,10 @@ json-file логов; без `depends_on: condition: service_healthy` — litell
 
 | Класс | Семантика | Primary | Fallback |
 |---|---|---|---|
-| `top` | качественные рассуждения, большой контекст | Kimi `k3.1-pro` | GLM `glm-5.3` |
-| `optimal` | сбалансированный основной режим | GLM `glm-5.3` | Kimi `k3.1-pro` |
-| `fast` | быстрые ответы, субагенты | Kimi `k3.1-pro-highspeed` | GLM `glm-5.3-flash` |
-| `cheap` | массовые лёгкие запросы | GLM `glm-5.3-flash` | Kimi `k3.1-pro-highspeed` |
+| `fable` | топовая: рассуждения, анализ репо, ревью, vision | Kimi `k3.1-pro` | `opus` (GLM) |
+| `opus` | оптимальная: основная работа | GLM `glm-5.3` | `fable` (Kimi) |
+| `sonnet` | быстрая: лёгкий интерактив | Kimi `k3.1-pro-highspeed` | `haiku` (GLM) |
+| `haiku` | дешёвая: субагенты, auto, механика | GLM `glm-5.3-flash` | `sonnet` (Kimi) |
 
 Переключение — только при ошибке **до начала ответа**; mid-stream fallback —
 именованный предел, не обещание. Клиент получает scoped virtual key (4 алиаса), не
@@ -91,10 +91,10 @@ master key.
 ## Подключение клиентов
 
 Claude Code: `ANTHROPIC_BASE_URL` (без `/v1`) + `ANTHROPIC_AUTH_TOKEN` = virtual key +
-модельные env по классам (`ANTHROPIC_MODEL=top`, Sonnet=`optimal`, Haiku=`cheap`,
-субагенты=`fast`, auto mode=`cheap`), контекстные 1M-переменные — на клиенте.
+модельные env по ролям (`ANTHROPIC_MODEL=opus`, Fable=`fable`, Sonnet=`sonnet`,
+Haiku/субагенты/auto=`haiku`), контекстные 1M-переменные — на клиенте.
 Discovery (`CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1`) отдаёт алиасы шлюза в
-пикер `/model`. OpenCode: `model`=`optimal`/`top`, `small_model`=`cheap`.
+пикер `/model`. OpenCode: `model`=`opus`/`fable`, `small_model`=`haiku`.
 Операторские детали (профили, ловушка cwd-перехвата) — README.
 
 ## Скрипты

@@ -48,15 +48,17 @@ configs:
   # created in the UI.
   policy_yaml:
     content: |
-      # Cross-provider fallbacks by public alias (class -> fallback class).
+      # Cross-provider fallbacks by public alias (role -> fallback role,
+      # always the other provider: a full provider outage keeps both the
+      # heavy and the light slot served, by the other side's models).
       # Switching happens only on a failure before the response starts;
-      # mid-stream fallback is a named limit, not a promise.
+      # mid-stream fallback is a named limit.
       router_settings:
         fallbacks:
-          - top: [optimal]
-          - optimal: [top]
-          - fast: [cheap]
-          - cheap: [fast]
+          - fable: [opus]
+          - opus: [fable]
+          - sonnet: [haiku]
+          - haiku: [sonnet]
       litellm_settings:
         num_retries: 2
 
@@ -98,7 +100,7 @@ services:
       # Compose does not recreate a container when only config content
       # changes; a label does. Keep it = sha256 of the policy content,
       # first 16 hex digits (tests/test_template_pins.py fails otherwise).
-      llmgate.policy-sha256: "7c6992292cae0385"
+      llmgate.policy-sha256: "f1e713431c0f4a76"
     restart: unless-stopped
     logging:
       driver: json-file

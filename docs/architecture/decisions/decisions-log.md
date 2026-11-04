@@ -12,7 +12,7 @@
 
 | ID | Дата | Статус | Решение (1 строка) | Амендменты | Файл |
 |---|---|---|---|---|---|
-| D-001 | 2026-11-04 | ACTIVE | Артефакт: единый compose-шаблон (litellm+db), native `/v1/messages` passthrough, владение конфигом БД/UI vs YAML (dual-write запрещён) | — | [D-001-artefakt-llm-gate.md](D-001-artefakt-llm-gate.md) |
+| D-001 | 2026-11-04 | ACTIVE | Артефакт: единый compose-шаблон (litellm+db), native `/v1/messages` passthrough, владение конфигом БД/UI vs YAML (dual-write запрещён) | Amendment 1 (2026-11-04): алиасы → роли CC | [D-001-artefakt-llm-gate.md](D-001-artefakt-llm-gate.md) |
 | D-002 | 2026-11-04 | ACTIVE | Контракт governetics: x-g9s-config 5 ключей, fail-loud `${KEY:?}`, invisible-секреты, content-only configs, db без host-портов, restart вместо depends_on | — | [D-002-kontrakt-governetics.md](D-002-kontrakt-governetics.md) |
 
 ## Superseded / dropped

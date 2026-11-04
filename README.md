@@ -69,12 +69,16 @@ Models → Add Model. Ключ провайдера вводится **в опр
 — z.ai); одни и те же ключи годятся для обоих контуров. Публичное имя (`model_name`) —
 алиас-класс; upstream-модель — серверный ID провайдера:
 
+Алиасы названы по ролям слотов Claude Code (решение оператора 2026-11-04 по
+эксплуатации и внешним данным: GLM — рабочая лошадь кодинга, Kimi — рассуждения
+и лёгкий Kimi-контур):
+
 | Алиас | Upstream (`model`) | `api_base` | Режим |
 |---|---|---|---|
-| `top` | `k3.1-pro` | `https://api.kimi.ai/coding/` | passthrough |
-| `optimal` | `glm-5.3` | `https://api.z.ai/api/anthropic` | passthrough |
-| `fast` | `k3.1-pro-highspeed` | `https://api.kimi.ai/coding/` | passthrough |
-| `cheap` | `glm-5.3-flash` | `https://api.z.ai/api/anthropic` | passthrough |
+| `fable` | `k3.1-pro` | `https://api.kimi.ai/coding/` | passthrough |
+| `opus` | `glm-5.3` | `https://api.z.ai/api/anthropic` | passthrough |
+| `sonnet` | `k3.1-pro-highspeed` | `https://api.kimi.ai/coding/` | passthrough |
+| `haiku` | `glm-5.3-flash` | `https://api.z.ai/api/anthropic` | passthrough |
 
 Режим passthrough: `supported_endpoints: ["/v1/messages"]` — шлюз переводит
 Anthropic-протокол как есть, без конвертации. Вписывается в поле **Model Info (JSON)**
@@ -96,10 +100,10 @@ Fallback между провайдерами настраивается в `depl
 
 | Класс | Primary | Fallback |
 |---|---|---|
-| `top` | Kimi `k3.1-pro` | GLM `glm-5.3` |
-| `optimal` | GLM `glm-5.3` | Kimi `k3.1-pro` |
-| `fast` | Kimi `k3.1-pro-highspeed` | GLM `glm-5.3-flash` |
-| `cheap` | GLM `glm-5.3-flash` | Kimi `k3.1-pro-highspeed` |
+| `fable` (рассуждения/анализ/ревью) | Kimi `k3.1-pro` | `opus` = GLM `glm-5.3` |
+| `opus` (основная работа) | GLM `glm-5.3` | `fable` = Kimi `k3.1-pro` |
+| `sonnet` (быстрый лёгкий контур) | Kimi `k3.1-pro-highspeed` | `haiku` = GLM `glm-5.3-flash` |
+| `haiku` (субагенты/auto/механика) | GLM `glm-5.3-flash` | `sonnet` = Kimi `k3.1-pro-highspeed` |
 
 ## 3. Подключение Claude Code
 
@@ -109,24 +113,25 @@ Fallback между провайдерами настраивается в `depl
 |---|---|
 | `ANTHROPIC_BASE_URL` | `http://127.0.0.1:4000` (локально; без `/v1`) · `https://llm-gate.lab.governetics.ru` (remote) |
 | `ANTHROPIC_AUTH_TOKEN` | virtual key `sk-…` |
-| `ANTHROPIC_MODEL` | `top` |
-| `ANTHROPIC_DEFAULT_FABLE_MODEL` / `ANTHROPIC_DEFAULT_OPUS_MODEL` | `top` |
-| `ANTHROPIC_DEFAULT_SONNET_MODEL` | `optimal` |
-| `ANTHROPIC_DEFAULT_HAIKU_MODEL` | `cheap` |
-| `CLAUDE_CODE_SUBAGENT_MODEL` | `fast` |
-| `CLAUDE_CODE_AUTO_MODE_MODEL` | `cheap` (клиентский классификатор) |
+| `ANTHROPIC_MODEL` | `opus` |
+| `ANTHROPIC_DEFAULT_FABLE_MODEL` | `fable` |
+| `ANTHROPIC_DEFAULT_OPUS_MODEL` | `opus` |
+| `ANTHROPIC_DEFAULT_SONNET_MODEL` | `sonnet` |
+| `ANTHROPIC_DEFAULT_HAIKU_MODEL` | `haiku` |
+| `CLAUDE_CODE_SUBAGENT_MODEL` | `haiku` (важные ревью — явный `--model fable`) |
+| `CLAUDE_CODE_AUTO_MODE_MODEL` | `haiku` (клиентский классификатор) |
 | `CLAUDE_CODE_AUTO_COMPACT_WINDOW` / `CLAUDE_CODE_MAX_CONTEXT_TOKENS` | `1000000` — 1M-контекст |
 | `CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY` | `1` — пикер `/model` покажет алиасы (CC ≥ 2.1.129) |
 
 - **1M-контекст — две равнозначные клиентские ручки:** env выше или суффикс `[1m]` в
-  селекте модели (`top[1m]`). Claude Code вырезает суффикс до отправки — шлюз получает
+  селекте модели (`opus[1m]`). Claude Code вырезает суффикс до отправки — шлюз получает
   голый алиас, серверной роли у суффикса нет.
 - Не полагайтесь на пикер `/model` как на основной канал выбора: по документации
   LiteLLM ID без `claude`/`anthropic` в имени могут не сохраняться выбором — основная
   модель задаётся env профиля, пикер вторичен.
-- OpenCode: `model` = `optimal` (тяжёлые задачи — `top`), `small_model` = `cheap`.
+- OpenCode: `model` = `opus` (тяжёлые задачи — `fable`), `small_model` = `haiku`.
 
-Проверка: `claude -p 'Reply with exactly: pong' --model top` — ответ приходит через шлюз.
+Проверка: `claude -p 'Reply with exactly: pong' --model opus` — ответ приходит через шлюз.
 
 ## 4. Remote-контур (панель governetics)
 

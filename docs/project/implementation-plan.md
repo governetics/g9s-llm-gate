@@ -14,6 +14,9 @@ exploration — дата установки: 2026-11-04
   passthrough — спайк 261104-01 фаза 0), встроенный Admin UI, модели в
   PostgreSQL 16.15 (`STORE_MODEL_IN_DB`).
 - Docker Compose — единый шаблон `deploy/compose.yml` (local + governetics).
+- Алиасы (роли CC-слотов, с 2026-11-04): `fable`=Kimi k3.1-pro ·
+  `opus`=GLM glm-5.3 (primary тяжёлого) · `sonnet`=Kimi highspeed ·
+  `haiku`=GLM flash (субагенты/auto); fallback перекрёстный по провайдерам.
 - Тесты: pytest + PyYAML (L0 пины → L1 compose config → L2 парсер панели).
 
 ## Фазы

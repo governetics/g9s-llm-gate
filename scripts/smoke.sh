@@ -10,8 +10,9 @@
 #               (default: https://llm-gate.lab.governetics.ru)
 #   SMOKE_KEY   virtual key, sent as "Authorization: Bearer ...";
 #               REQUIRED; its value is never printed by this script
-#   MODEL       public alias under test (default: top)
-#   TOOL_MODEL  public alias for the tool-use step (default: optimal)
+#   MODEL       public alias under test (default: opus)
+#   TOOL_MODEL  public alias for the tool-use step (default: fable;
+#               the two defaults cover both providers in one run)
 #               Model aliases are interpolated into a JSON body and a grep
 #               pattern: use plain identifiers (letters, digits, -, _, [1m]),
 #               not values with quotes or backslashes.
@@ -33,8 +34,8 @@ fi
 
 BASE_URL="${BASE_URL:-https://llm-gate.lab.governetics.ru}"
 BASE_URL="${BASE_URL%/}"
-MODEL="${MODEL:-top}"
-TOOL_MODEL="${TOOL_MODEL:-optimal}"
+MODEL="${MODEL:-opus}"
+TOOL_MODEL="${TOOL_MODEL:-fable}"
 MAX_TIME=60
 FAILED=0
 
