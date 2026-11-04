@@ -8,6 +8,18 @@
 
 ### Added
 
+- Документационный блок фазы 3: README-оператор (оба контура, эксплуатация, известные
+  пределы, troubleshooting); architecture.md as-is (топология, passthrough, владение
+  конфигурацией, алиасы/классы, контуры); ADR `D-001` (артефакт: единый шаблон,
+  passthrough, владение конфигом) и `D-002` (контракт governetics). Зафиксировано
+  завершение фазы 2 — деплой под governetics: edge-маршрут
+  `llm-gate.lab.governetics.ru`, модели + virtual key на remote, remote smoke 5/5
+  через HTTPS (D-001, D-002).
+
+## 2026-11-04
+
+### Added
+
 - Артефакт развёртывания фазы 1: единый compose-шаблон `deploy/compose.yml`
   (litellm `v1.108.0` + postgres `16.15`, policy-YAML через `configs.content`
   без `model_list` — модели/credentials владеет БД/UI), `.env.example`,
