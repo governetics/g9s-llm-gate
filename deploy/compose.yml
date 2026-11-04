@@ -1,0 +1,135 @@
+# LLM gate — compose template of an operator project on governetics (Path A).
+#
+# Paste the whole file into the project's `compose_template` field in the panel.
+# The panel touches only declared places: `name`, `image` (rewritten to a
+# digest on :deploy), and it appends `env_file` / the /etc/g9s/files volume
+# for the keys below. Everything else reaches the node as written.
+#
+# Rules this file keeps (pinned by tests/test_template_pins.py):
+#   - every required key is substituted as ${KEY:?...}: an empty value fails
+#     `up` loudly instead of publishing on all addresses / a random port /
+#     a broken database URL (the panel lets "" through its completeness check);
+#   - every declared key has a consumer service, and every substitution
+#     stands for a declared key;
+#   - provider model definitions and credentials are NOT here: they live in
+#     the database via the Admin UI (dual-write is forbidden). This file
+#     carries routing policy only; no `$` inside the policy content below --
+#     compose interpolates config content, and the panel stubs ${...} before
+#     parsing the template;
+#   - every service: healthcheck, restart: unless-stopped, json-file log
+#     rotation;
+#   - no depends_on with condition: service_healthy (litellm starting ahead
+#     of db readiness exits and is brought back by the restart policy -- an
+#     accepted trade, documented here), no external networks;
+#   - db has no host ports: the database answers only on the compose network.
+
+x-g9s-config:
+  envs:
+    # Host address the proxy port is published on. Local: 127.0.0.1.
+    # Remote: an address the g9s-edge reverse proxy can reach (host loopback
+    # is NOT reachable from edge).
+    LLM_GATE_BIND: {consumers: [litellm]}
+    # Host port of the proxy; the container port is fixed at 4000.
+    LLM_GATE_PORT: {consumers: [litellm]}
+    # LiteLLM master key, `sk-` prefix required; also the initial UI login
+    # until a DB admin takes over.
+    LLM_GATE_MASTER_KEY: {consumers: [litellm], visibility: invisible}
+    # Salt encrypting provider credentials in the database. NOT rotatable:
+    # losing it loses every stored credential; keep it with DB backups.
+    LLM_GATE_SALT_KEY: {consumers: [litellm], visibility: invisible}
+    # Postgres password. URL-safe charset only (letters/digits): the value is
+    # embedded verbatim into DATABASE_URL, special characters break the DSN.
+    LLM_GATE_POSTGRES_PASSWORD: {consumers: [litellm, db], visibility: invisible}
+
+configs:
+  # Routing policy only: fallbacks by public alias and retry count. Model
+  # definitions, provider credentials and keys are owned by the database /
+  # Admin UI and never appear here; the aliases below refer to model names
+  # created in the UI.
+  policy_yaml:
+    content: |
+      # Cross-provider fallbacks by public alias (class -> fallback class).
+      # Switching happens only on a failure before the response starts;
+      # mid-stream fallback is a named limit, not a promise.
+      router_settings:
+        fallbacks:
+          - top: [optimal]
+          - optimal: [top]
+          - fast: [cheap]
+          - cheap: [fast]
+      litellm_settings:
+        num_retries: 2
+
+services:
+  litellm:
+    # Pinned minor tag: Prisma migrations run on start, an update is a
+    # pin-change -> backup -> verify procedure, never a rolling latest.
+    image: ghcr.io/berriai/litellm:v1.108.0
+    # Without an explicit --config the image starts with an empty model list
+    # and every request fails "Invalid model name" (measured on v1.108.0).
+    command: [--config, /app/proxy_server_config.yaml, --port, "4000"]
+    ports:
+      - "${LLM_GATE_BIND:?LLM_GATE_BIND is not set}:${LLM_GATE_PORT:?LLM_GATE_PORT is not set}:4000"
+    environment:
+      # Mapped here (not env_file): the panel appends env_file for its keys
+      # and env_precedence would shadow this mapping.
+      LITELLM_MASTER_KEY: "${LLM_GATE_MASTER_KEY:?LLM_GATE_MASTER_KEY is not set}"
+      LITELLM_SALT_KEY: "${LLM_GATE_SALT_KEY:?LLM_GATE_SALT_KEY is not set}"
+      STORE_MODEL_IN_DB: "True"
+      DATABASE_URL: "postgresql://llmgate:${LLM_GATE_POSTGRES_PASSWORD:?LLM_GATE_POSTGRES_PASSWORD is not set}@db:5432/llmgate"
+    healthcheck:
+      # /health/liveliness: no auth, no LLM tokens spent. /health is
+      # forbidden as a probe -- it sends real requests to upstreams.
+      test:
+        - CMD
+        - python3
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness', timeout=5)"
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      # First start runs Prisma migrations against an empty database.
+      start_period: 300s
+    configs:
+      - source: policy_yaml
+        target: /app/proxy_server_config.yaml
+        mode: 0444
+    labels:
+      # Compose does not recreate a container when only config content
+      # changes; a label does. Keep it = sha256 of the policy content,
+      # first 16 hex digits (tests/test_template_pins.py fails otherwise).
+      llmgate.policy-sha256: "7c6992292cae0385"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  db:
+    # Pinned minor tag (16.x latest in the registry, checked via
+    # `docker manifest inspect`); never a bare major, never latest.
+    image: postgres:16.15
+    environment:
+      POSTGRES_USER: llmgate
+      POSTGRES_DB: llmgate
+      POSTGRES_PASSWORD: "${LLM_GATE_POSTGRES_PASSWORD:?LLM_GATE_POSTGRES_PASSWORD is not set}"
+    volumes:
+      - type: volume
+        source: db-data
+        target: /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "llmgate", "-d", "llmgate"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  db-data:
