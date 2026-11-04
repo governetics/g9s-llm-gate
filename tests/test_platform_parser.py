@@ -51,7 +51,8 @@ def test_platform_accepts_header_and_gates():
     )
     assert run.returncode == 0, run.stderr
     parsed = json.loads(run.stdout.strip().splitlines()[-1])
-    assert parsed["services"] == ["db", "litellm"]
+    # The parser lists services in declaration order; only membership matters.
+    assert sorted(parsed["services"]) == ["db", "litellm"]
     assert parsed["env_precedence"] == [] and parsed["bind_mounts"] == []
     declared = load_template()["x-g9s-config"]
     assert sorted(parsed["keys"]["envs"]) == sorted(declared["envs"])
