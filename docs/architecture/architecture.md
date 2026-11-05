@@ -68,11 +68,12 @@ json-file логов; без `depends_on: condition: service_healthy` — litell
 |---|---|---|---|
 | `fable` | топовая: рассуждения, анализ репо, ревью, vision | Kimi `k3.1-pro` | `opus` (GLM) |
 | `opus` | оптимальная: основная работа | GLM `glm-5.3` | `fable` (Kimi) |
-| `sonnet` | быстрая: лёгкий интерактив | Kimi `k3.1-pro-highspeed` | `haiku` (GLM) |
-| `haiku` | дешёвая: субагенты, auto, механика | GLM `glm-5.3-flash` | `sonnet` (Kimi) |
+| `sonnet` | быстрая: лёгкий интерактив | GLM `glm-5.3-flash` | `swift` (Kimi) |
+| `haiku` | дешёвая: субагенты, auto, механика | GLM `glm-5.3-flash` | `swift` (Kimi) |
+| `swift` | полка: Kimi-fast, цель страховки лёгких | Kimi `k3.1-pro-highspeed` | `sonnet` (GLM) |
 
 Переключение — только при ошибке **до начала ответа**; mid-stream fallback —
-именованный предел, не обещание. Клиент получает scoped virtual key (4 алиаса), не
+именованный предел, не обещание. Клиент получает scoped virtual key (5 алиасов, вкл. swift), не
 master key.
 
 ## Контуры развёртывания

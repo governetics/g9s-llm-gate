@@ -223,7 +223,8 @@ def test_policy_contract(template, policy):
         assert isinstance(entry, dict) and len(entry) == 1, entry
         fallbacks.update(entry)
     assert fallbacks == {"fable": ["opus"], "opus": ["fable"],
-                         "sonnet": ["haiku"], "haiku": ["sonnet"]}
+                         "sonnet": ["swift"], "haiku": ["swift"],
+                         "swift": ["sonnet"]}
     assert policy["litellm_settings"]["num_retries"] == 2
     assert set(policy) == {"router_settings", "litellm_settings"}
 

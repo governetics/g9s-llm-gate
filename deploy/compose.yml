@@ -57,8 +57,9 @@ configs:
         fallbacks:
           - fable: [opus]
           - opus: [fable]
-          - sonnet: [haiku]
-          - haiku: [sonnet]
+          - sonnet: [swift]
+          - haiku: [swift]
+          - swift: [sonnet]
       litellm_settings:
         num_retries: 2
 
@@ -100,7 +101,7 @@ services:
       # Compose does not recreate a container when only config content
       # changes; a label does. Keep it = sha256 of the policy content,
       # first 16 hex digits (tests/test_template_pins.py fails otherwise).
-      llmgate.policy-sha256: "f1e713431c0f4a76"
+      llmgate.policy-sha256: "1661bcd86b5e44d8"
     restart: unless-stopped
     logging:
       driver: json-file

@@ -61,7 +61,7 @@ governetics — remote smoke 5/5); фаза 3 (приёмка, hardening) в р�
 UI: `http://127.0.0.1:4000/ui` — логин `admin`, пароль — master key (до создания
 DB-админа; hardening фазы 3 это меняет).
 
-### Модели (4)
+### Модели (5)
 
 Models → Add Model. Ключ провайдера вводится **в определении модели** (поле `api_key` в
 `litellm_params`; раздел LLM Credentials в v1.108.0 OpenAI-compatible провайдеров не
@@ -69,15 +69,16 @@ Models → Add Model. Ключ провайдера вводится **в опр
 — z.ai); одни и те же ключи годятся для обоих контуров. Публичное имя (`model_name`) —
 алиас-класс; upstream-модель — серверный ID провайдера:
 
-Алиасы названы по ролям слотов Claude Code (решение оператора 2026-11-04 по
-эксплуатации и внешним данным: GLM — рабочая лошадь кодинга, Kimi — рассуждения
-и лёгкий Kimi-контур):
+Алиасы названы по ролям слотов Claude Code (решения оператора 2026-11-04/05:
+GLM — рабочая лошадь кодинга и весь лёгкий контур, Kimi — рассуждения;
+`swift` — полка Kimi-fast, цель страховки лёгких слотов):
 
 | Алиас | Upstream (`model`) | `api_base` | Режим |
 |---|---|---|---|
 | `fable` | `k3.1-pro` | `https://api.kimi.ai/coding/` | passthrough |
 | `opus` | `glm-5.3` | `https://api.z.ai/api/anthropic` | passthrough |
-| `sonnet` | `k3.1-pro-highspeed` | `https://api.kimi.ai/coding/` | passthrough |
+| `sonnet` | `glm-5.3-flash` | `https://api.z.ai/api/anthropic` | passthrough |
+| `swift` | `k3.1-pro-highspeed` | `https://api.kimi.ai/coding/` | passthrough |
 | `haiku` | `glm-5.3-flash` | `https://api.z.ai/api/anthropic` | passthrough |
 
 Режим passthrough: `supported_endpoints: ["/v1/messages"]` — шлюз переводит
@@ -90,7 +91,7 @@ Anthropic-протокол как есть, без конвертации. Вп�
 
 ### Virtual key для Claude Code
 
-Virtual Keys → Create Key: scope — все 4 алиаса, бюджет/лимиты по желанию. Ключ
+Virtual Keys → Create Key: scope — все 5 алиасов (включая `swift`: без него fallback лёгких слотов будет молча пропускаться — LiteLLM проверяет scope у fallback-целей), бюджет/лимиты по желанию. Ключ
 `sk-…` показывается один раз — сохранить. Клиент получает **virtual key**, не master.
 
 ### Классы и fallback
@@ -102,8 +103,9 @@ Fallback между провайдерами настраивается в `depl
 |---|---|---|
 | `fable` (рассуждения/анализ/ревью) | Kimi `k3.1-pro` | `opus` = GLM `glm-5.3` |
 | `opus` (основная работа) | GLM `glm-5.3` | `fable` = Kimi `k3.1-pro` |
-| `sonnet` (быстрый лёгкий контур) | Kimi `k3.1-pro-highspeed` | `haiku` = GLM `glm-5.3-flash` |
-| `haiku` (субагенты/auto/механика) | GLM `glm-5.3-flash` | `sonnet` = Kimi `k3.1-pro-highspeed` |
+| `sonnet` (быстрый лёгкий контур) | GLM `glm-5.3-flash` | `swift` = Kimi `k3.1-pro-highspeed` |
+| `haiku` (субагенты/auto/механика) | GLM `glm-5.3-flash` | `swift` = Kimi `k3.1-pro-highspeed` |
+| `swift` (полка страховки, вручную) | Kimi `k3.1-pro-highspeed` | `sonnet` = GLM `glm-5.3-flash` |
 
 ## 3. Подключение Claude Code
 
