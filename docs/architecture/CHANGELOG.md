@@ -17,7 +17,11 @@
   Enterprise-лицензирован (`team_public_model_name`; чтение исходников
   v1.108.0) — вместо него экземпляр на владельца подписки: контур оператора
   на `g9s-devbox` (`llm-dev.lab.governetics.ru`), контур iflex на
-  `minipc-firebat` (Amendment 4 к D-001).
+  `minipc-firebat` (Amendment 4 к D-001). Развёрнуто тем же днём: оба
+  экземпляра на едином шаблоне; firebat переработан — `iflex-*`
+  переименованы в канон с сохранением credentials, core-контур оператора
+  снят с firebat (deployments, юзер, команда, VK). Полка `swift` сохранена
+  как ручной класс на обоих контурах (на firebat — токен iflex).
 
 ### Added
 

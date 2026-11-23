@@ -72,12 +72,12 @@ json-file логов; без `depends_on: condition: service_healthy` — litell
 | `opus` | оптимальная: основная работа | GLM `glm-5.3` | `fable` (Kimi) |
 | `sonnet` | быстрая: лёгкий интерактив | Kimi `k3.1-pro-highspeed` | `haiku` (GLM) |
 | `haiku` | дешёвая: субагенты, auto, механика | GLM `glm-5.3-flash` | `sonnet` (Kimi) |
-| `iflex-*` | **interim** (firebat до переработки): те же роли на подписке iflex, sonnet=kimi-highspeed→glm-flash, полка `iflex-swift` | подписка iflex | парный `iflex-*` другого провайдера |
+| `swift` | полка: Kimi highspeed, вручную | Kimi `k3.1-pro-highspeed` | `haiku` (GLM) |
 
 Переключение — только при ошибке **до начала ответа**; mid-stream fallback —
-именованный предел, не обещание. Клиент получает scoped virtual key (4
-канонических алиаса — fallback-пары покрывают друг друга; interim-ключи iflex —
-5 имён `iflex-*`), не master key.
+именованный предел, не обещание. Клиент получает scoped virtual key
+(канонические алиасы, включая полку `swift` — fallback-цели должны входить в
+scope), не master key.
 
 ## Контуры развёртывания
 
@@ -90,9 +90,9 @@ json-file логов; без `depends_on: condition: service_healthy` — litell
     (нода `g9s-devbox`) — **контур оператора**: канонические имена на
     подписках оператора;
   - `llm-gate.lab.governetics.ru` → `reverse_proxy 10.0.0.110:4000`
-    (нода `g9s-minipc-firebat`) — **контур команды iflex**; до переработки —
-    общий экземпляр с interim-именами `iflex-*` и полкой `swift` на старом
-    applied-шаблоне (панель применяет новый шаблон только явным Deploy).
+    (нода `g9s-minipc-firebat`) — **контур команды iflex**: канонические
+    имена на токенах iflex (развёрнуто 2026-11-23; панель применяет шаблон
+    только явным Deploy).
   Прямой порт 4000 из LAN отвечает by design; из интернета узлы за NAT по
   топологии сети (не проба шлюза — топологический факт). Секреты контуров
   независимы (у каждого свой salt). Same-name per-team на одном экземпляре —
