@@ -60,6 +60,17 @@ configs:
           - sonnet: [swift]
           - haiku: [swift]
           - swift: [sonnet]
+          # team iflex mirrors the same cross-provider pairs on its own
+          # subscription deployments (iflex-* names; a public alias cannot
+          # route per-team -- measured, see D-001 Amendment 3)
+          - iflex-fable: [iflex-opus]
+          - iflex-opus: [iflex-fable]
+          - iflex-sonnet: [iflex-haiku]
+          - iflex-haiku: [iflex-sonnet]
+          # iflex sonnet sits on the same provider as the swift shelf
+          # (operator decision), so the shelf falls back to the other
+          # provider's fast model, keeping every pair cross-provider
+          - iflex-swift: [iflex-haiku]
       litellm_settings:
         num_retries: 2
 
@@ -101,7 +112,7 @@ services:
       # Compose does not recreate a container when only config content
       # changes; a label does. Keep it = sha256 of the policy content,
       # first 16 hex digits (tests/test_template_pins.py fails otherwise).
-      llmgate.policy-sha256: "1661bcd86b5e44d8"
+      llmgate.policy-sha256: "ff51a706f9d5da49"
     restart: unless-stopped
     logging:
       driver: json-file

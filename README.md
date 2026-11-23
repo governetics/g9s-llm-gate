@@ -89,6 +89,39 @@ Anthropic-протокол как есть, без конвертации. Вп�
 > **Модельные ID — без суффикса `[1m]`.** Суффикс `[1m]` — клиентская нотация Claude Code
 > (см. раздел 3); серверных моделей с `[1m]` не существует, шлюз о нём не знает.
 
+### Команда iflex (своя подписка)
+
+Отдельные deployment'ы `iflex-fable` / `iflex-opus` / `iflex-sonnet` /
+`iflex-haiku` / `iflex-swift` на подписке iflex (те же провайдеры, свои
+токены; sonnet здесь — kimi-highspeed, fallback на glm-flash). Одинаковые
+публичные имена для разных команд шлюз не даёт (измерено — team
+`metadata.model_aliases` не применяется к роутингу `/v1/messages`), поэтому
+профиль участника команды указывает `iflex-*` имена напрямую:
+
+```json
+"ANTHROPIC_MODEL": "iflex-opus",
+"ANTHROPIC_DEFAULT_FABLE_MODEL": "iflex-fable",
+"ANTHROPIC_DEFAULT_SONNET_MODEL": "iflex-sonnet",
+"ANTHROPIC_DEFAULT_HAIKU_MODEL": "iflex-haiku",
+"ANTHROPIC_DEFAULT_OPUS_MODEL": "iflex-opus",
+"CLAUDE_CODE_SUBAGENT_MODEL": "iflex-haiku",
+"CLAUDE_CODE_AUTO_MODE_MODEL": "iflex-haiku"
+```
+
+Фактические upstream'ы (перекрёстность пар сохранена; полка swift здесь
+падает на glm-flash, т.к. sonnet занят kimi-стороной):
+
+| Алиас iflex | Upstream | Сторона |
+|---|---|---|
+| `iflex-fable` | `k3.1-pro` | Kimi |
+| `iflex-opus` | `glm-5.3` | Z.ai |
+| `iflex-sonnet` | `k3.1-pro-highspeed` | Kimi |
+| `iflex-haiku` | `glm-5.3-flash` | Z.ai |
+| `iflex-swift` | `k3.1-pro-highspeed` | Kimi (полка) |
+
+Ключи выдаёт админ (команда `iflex` в UI: привязка юзер↔ключ↔команда,
+бюджеты/tpm на ключе; наблюдение — Logs и `gate_budget.py`).
+
 ### Virtual key для Claude Code
 
 Virtual Keys → Create Key: scope — все 5 алиасов (включая `swift`: без него fallback лёгких слотов будет молча пропускаться — LiteLLM проверяет scope у fallback-целей), бюджет/лимиты по желанию. Ключ
@@ -180,9 +213,10 @@ Fallback между провайдерами настраивается в `depl
   порог покраснения, подпись). Секция settings.json:
   `"statusLine": {"type": "command", "command": "python3 …/gate_budget.py"}`.
 
-Onboarding участника команды: свой virtual key (в команде — обычные имена
-моделей; маршрутизация на подписку команды делает шлюз), CC-профиль как в
-разделе 3, но со своим `ANTHROPIC_AUTH_TOKEN` + statusline.
+Onboarding участника команды: свой virtual key от админа, CC-профиль как в
+разделе 3, но с **именами `iflex-*`** (см. «Команда iflex» в разделе 2 —
+одинаковые публичные имена для разных команд шлюз не маршрутизирует),
+своим `ANTHROPIC_AUTH_TOKEN` + statusline.
 
 ## 5. Эксплуатация
 

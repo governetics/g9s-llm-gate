@@ -71,6 +71,7 @@ json-file логов; без `depends_on: condition: service_healthy` — litell
 | `sonnet` | быстрая: лёгкий интерактив | GLM `glm-5.3-flash` | `swift` (Kimi) |
 | `haiku` | дешёвая: субагенты, auto, механика | GLM `glm-5.3-flash` | `swift` (Kimi) |
 | `swift` | полка: Kimi-fast, цель страховки лёгких | Kimi `k3.1-pro-highspeed` | `sonnet` (GLM) |
+| `iflex-*` | команда iflex: те же роли на своей подписке (sonnet=kimi-highspeed→glm-flash) | подписка iflex | парный `iflex-*` другого провайдера |
 
 Переключение — только при ошибке **до начала ответа**; mid-stream fallback —
 именованный предел, не обещание. Клиент получает scoped virtual key (5 алиасов, вкл. swift), не
