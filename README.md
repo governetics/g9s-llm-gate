@@ -5,8 +5,11 @@ LLM-провайдерам. Начальный контур — провайде
 (`/v1/messages`). Один и тот же compose-шаблон разворачивается в двух контурах:
 
 - **локальный** — `docker compose` на рабочей машине (публикация `127.0.0.1:4000`);
-- **remote** — платформа governetics (панель + edge-прокси, HTTPS
-  `llm-gate.lab.governetics.ru`, нода `g9s-minipc-firebat`).
+- **remote** — платформа governetics (панель + edge-прокси, HTTPS): **экземпляр на
+  владельца подписок** (D-001 Amendment 4). `llm-dev.lab.governetics.ru`
+  (нода `g9s-devbox`) — контур оператора; `llm-gate.lab.governetics.ru`
+  (нода `g9s-minipc-firebat`) — контур команды iflex (до его переработки — с
+  interim-именами `iflex-*`, см. «Команда iflex»).
 
 Разделение ответственности — один хозяин на область:
 
@@ -20,8 +23,9 @@ LLM-провайдерам. Начальный контур — провайде
 | `litellm` | `ghcr.io/berriai/litellm:v1.108.0` | прокси `/v1/messages` + Admin UI (`:4000`) |
 | `db` | `postgres:16.15` | модели/credentials/virtual keys/spend (named volume `db-data`) |
 
-**Статус:** стадия exploration; фазы 0–2 завершены (спайк, локальный стек, деплой под
-governetics — remote smoke 5/5); фаза 3 (приёмка, hardening) в работе.
+**Статус:** стадия exploration; фазы 0–3 завершены (спайк, локальный стек, деплой под
+governetics, приёмка/hardening/доки); фаза 4 — миграция на экземпляр-на-владельца
+подписки — в работе (D-001 Amendment 4).
 
 Документация: as-is — [docs/architecture/architecture.md](docs/architecture/architecture.md);
 решения — [docs/architecture/decisions/decisions-log.md](docs/architecture/decisions/decisions-log.md);
@@ -61,24 +65,27 @@ governetics — remote smoke 5/5); фаза 3 (приёмка, hardening) в р�
 UI: `http://127.0.0.1:4000/ui` — логин `admin`, пароль — master key (до создания
 DB-админа; hardening фазы 3 это меняет).
 
-### Модели (5)
+### Модели (канон — 4)
 
 Models → Add Model. Ключ провайдера вводится **в определении модели** (поле `api_key` в
 `litellm_params`; раздел LLM Credentials в v1.108.0 OpenAI-compatible провайдеров не
 знает). Ключи берутся в личных кабинетах подписок (Kimi Coding — kimi.com, Z.ai Coding
-— z.ai); одни и те же ключи годятся для обоих контуров. Публичное имя (`model_name`) —
+— z.ai). Публичное имя (`model_name`) —
 алиас-класс; upstream-модель — серверный ID провайдера:
 
-Алиасы названы по ролям слотов Claude Code (решения оператора 2026-11-04/05:
-GLM — рабочая лошадь кодинга и весь лёгкий контур, Kimi — рассуждения;
-`swift` — полка Kimi-fast, цель страховки лёгких слотов):
+**Раскладка единая для всех экземпляров** (решение оператора 2026-11-23, D-001
+Amendment 4): экземпляры различаются только тем, **чьи** ключи провайдеров стоят в
+deployment'ах. GLM — тяжёлый кодинг (`opus`) и лёгкий слот `haiku`; Kimi —
+рассуждения (`fable`) и лёгкий `sonnet` (highspeed; осознанный возврат после
+таймаутов 2026-11-05 — компенсация живым cross-fallback на GLM flash). Полки
+`swift` в каноне нет: её upstream и fallback дублировали бы `sonnet` (на
+firebat до переработки контура остаётся как interim).
 
 | Алиас | Upstream (`model`) | `api_base` | Режим |
 |---|---|---|---|
 | `fable` | `k3.1-pro` | `https://api.kimi.ai/coding/` | passthrough |
 | `opus` | `glm-5.3` | `https://api.z.ai/api/anthropic` | passthrough |
-| `sonnet` | `glm-5.3-flash` | `https://api.z.ai/api/anthropic` | passthrough |
-| `swift` | `k3.1-pro-highspeed` | `https://api.kimi.ai/coding/` | passthrough |
+| `sonnet` | `k3.1-pro-highspeed` | `https://api.kimi.ai/coding/` | passthrough |
 | `haiku` | `glm-5.3-flash` | `https://api.z.ai/api/anthropic` | passthrough |
 
 Режим passthrough: `supported_endpoints: ["/v1/messages"]` — шлюз переводит
@@ -91,12 +98,18 @@ Anthropic-протокол как есть, без конвертации. Вп�
 
 ### Команда iflex (своя подписка)
 
-Отдельные deployment'ы `iflex-fable` / `iflex-opus` / `iflex-sonnet` /
-`iflex-haiku` / `iflex-swift` на подписке iflex (те же провайдеры, свои
-токены; sonnet здесь — kimi-highspeed, fallback на glm-flash). Одинаковые
-публичные имена для разных команд шлюз не даёт (измерено — team
-`metadata.model_aliases` не применяется к роутингу `/v1/messages`), поэтому
-профиль участника команды указывает `iflex-*` имена напрямую:
+**Целевая топология (D-001 Amendment 4):** iflex — свой экземпляр того же
+шаблона на `g9s-minipc-firebat` с **каноническими** именами (`fable`/`opus`/
+`sonnet`/`haiku`) и токенами iflex; профиль участника отличается от профиля
+оператора только `base_url` и virtual key. Одинаковые публичные имена для
+разных команд **на одном экземпляре** — Enterprise-фича LiteLLM
+(`team_public_model_name`; лицензионный гейт подтверждён чтением исходников
+v1.108.0), поэтому используется экземпляр на команду.
+
+**Interim (до переработки контура firebat):** команда работает на общем
+экземпляре `llm-gate.lab.governetics.ru` с выделенными deployment'ами
+`iflex-*` (те же провайдеры, свои токены). Профиль участника interim-периода
+указывает `iflex-*` имена напрямую:
 
 ```json
 "ANTHROPIC_MODEL": "iflex-opus",
@@ -124,7 +137,10 @@ Anthropic-протокол как есть, без конвертации. Вп�
 
 ### Virtual key для Claude Code
 
-Virtual Keys → Create Key: scope — все 5 алиасов (включая `swift`: без него fallback лёгких слотов будет молча пропускаться — LiteLLM проверяет scope у fallback-целей), бюджет/лимиты по желанию. Ключ
+Virtual Keys → Create Key: scope — все 4 канонических алиаса (fallback-цели
+обязаны входить в scope: LiteLLM проверяет scope у fallback-целей, а пары
+`fable`↔`opus` и `sonnet`↔`haiku` покрывают друг друга), бюджет/лимиты по
+желанию. Ключ
 `sk-…` показывается один раз — сохранить. Клиент получает **virtual key**, не master.
 
 ### Классы и fallback
@@ -136,9 +152,8 @@ Fallback между провайдерами настраивается в `depl
 |---|---|---|
 | `fable` (рассуждения/анализ/ревью) | Kimi `k3.1-pro` | `opus` = GLM `glm-5.3` |
 | `opus` (основная работа) | GLM `glm-5.3` | `fable` = Kimi `k3.1-pro` |
-| `sonnet` (быстрый лёгкий контур) | GLM `glm-5.3-flash` | `swift` = Kimi `k3.1-pro-highspeed` |
-| `haiku` (субагенты/auto/механика) | GLM `glm-5.3-flash` | `swift` = Kimi `k3.1-pro-highspeed` |
-| `swift` (полка страховки, вручную) | Kimi `k3.1-pro-highspeed` | `sonnet` = GLM `glm-5.3-flash` |
+| `sonnet` (быстрый лёгкий контур) | Kimi `k3.1-pro-highspeed` | `haiku` = GLM `glm-5.3-flash` |
+| `haiku` (субагенты/auto/механика) | GLM `glm-5.3-flash` | `sonnet` = Kimi `k3.1-pro-highspeed` |
 
 ## 3. Подключение Claude Code
 
@@ -146,7 +161,7 @@ Fallback между провайдерами настраивается в `depl
 
 | Переменная | Значение |
 |---|---|
-| `ANTHROPIC_BASE_URL` | `http://127.0.0.1:4000` (локально; без `/v1`) · `https://llm-gate.lab.governetics.ru` (remote) |
+| `ANTHROPIC_BASE_URL` | `http://127.0.0.1:4000` (локально; без `/v1`) · `https://llm-dev.lab.governetics.ru` (контур оператора) · `https://llm-gate.lab.governetics.ru` (контур iflex, interim) |
 | `ANTHROPIC_AUTH_TOKEN` | virtual key `sk-…` |
 | `ANTHROPIC_MODEL` | `opus` |
 | `ANTHROPIC_DEFAULT_FABLE_MODEL` | `fable` |
@@ -164,6 +179,11 @@ Fallback между провайдерами настраивается в `depl
 - Не полагайтесь на пикер `/model` как на основной канал выбора: по документации
   LiteLLM ID без `claude`/`anthropic` в имени могут не сохраняться выбором — основная
   модель задаётся env профиля, пикер вторичен.
+- При включённом discovery пикер может показывать каждое имя дважды: «Custom …
+  model» — из env-маппингов профиля, «From gateway» — из каталога `/v1/models`
+  шлюза. Это косметика: имя и маршрут запроса одинаковы. Каталог фильтруется по
+  scope ключа (измерено 2026-11-23), поэтому выключение discovery — ещё и способ
+  не видеть чужие по scope имена в interim-контуре.
 - OpenCode: `model` = `opus` (тяжёлые задачи — `fable`), `small_model` = `haiku`.
 
 Проверка: `claude -p 'Reply with exactly: pong' --model opus` — ответ приходит через шлюз.
@@ -184,10 +204,12 @@ Fallback между провайдерами настраивается в `depl
 3. Маршрут g9s-edge (настраивает оператор edge): host-based
    `llm-gate.lab.governetics.ru` → `reverse_proxy 10.0.0.110:4000` (не path-based).
 4. Deploy → `converged`. Холодный старт с Prisma-миграциями переживается самим деплоем.
-5. **Повторить раздел 2 против remote-контура**: у ноды своя пустая БД — 4 модели и
-   virtual key заводятся в Admin UI `https://llm-gate.lab.governetics.ru/ui` (логин —
-   remote master key) отдельно от локального контура. Smoke ниже требует именно
-   remote-virtual key.
+5. **Повторить раздел 2 против нового remote-экземпляра** (см. «Второй
+   экземпляр» ниже): у ноды своя пустая БД — 4 канонические модели и virtual
+   key заводятся в Admin UI `https://llm-dev.lab.governetics.ru/ui` (логин —
+   master key этого контура). К действующему экземпляру на `minipc-firebat`
+   (interim-контур iflex) этот шаг **не применять** — см. предупреждение ниже.
+   Smoke ниже требует именно remote-virtual key этого контура.
 6. Smoke:
 
    ```sh
@@ -196,6 +218,23 @@ Fallback между провайдерами настраивается в `depl
 
    5 шагов через `https://llm-gate.lab.governetics.ru`: auth-negative, models, messages,
    SSE, tool_use. Для локального стека: `BASE_URL=http://127.0.0.1:4000 SMOKE_KEY=… scripts/smoke.sh`.
+
+### Второй экземпляр (нода `g9s-devbox`, контур оператора)
+
+Тот же DC `llm-gate` панели (его `namespaces` расширены на `home` — namespace
+ноды devbox), отдельный node-project на ноде: BIND `10.0.0.100`, PORT `4000`,
+**свои** master/salt/postgres (секреты контура devbox; у каждого экземпляра свой
+salt). Edge-маршрут `llm-dev.lab.governetics.ru` →
+`reverse_proxy 10.0.0.100:4000` (host-based). После Deploy — раздел 2 против
+нового экземпляра: своя пустая БД, 4 канонические модели с ключами подписок
+оператора, свои virtual keys. Обновление шаблона в DC **не** переключает
+работающие экземпляры: применение — явным Deploy каждого node-project'а.
+
+> ⚠️ **Interim:** к работающему экземпляру на `minipc-firebat` (сейчас —
+> общий, с interim-именами `iflex-*`) каноническую таблицу раздела 2 **до его
+> переработки не применять**: созданное там имя `sonnet` слилось бы со старым
+> deployment `sonnet` (GLM flash) в одну балансируемую группу — подписки
+> перемешались бы. Переработка firebat — отдельный шаг фазы 4 (D-001 A4).
 
 ## 4a. Тарификация, лимиты, statusline
 
@@ -214,9 +253,9 @@ Fallback между провайдерами настраивается в `depl
   `"statusLine": {"type": "command", "command": "python3 …/gate_budget.py"}`.
 
 Onboarding участника команды: свой virtual key от админа, CC-профиль как в
-разделе 3, но с **именами `iflex-*`** (см. «Команда iflex» в разделе 2 —
-одинаковые публичные имена для разных команд шлюз не маршрутизирует),
-своим `ANTHROPIC_AUTH_TOKEN` + statusline.
+разделе 3 (в interim-период — с **именами `iflex-*`**, см. «Команда iflex» в
+разделе 2; после переработки контура firebat — канонические имена, профиль
+отличается только `base_url` и ключом), своим `ANTHROPIC_AUTH_TOKEN` + statusline.
 
 ## 5. Эксплуатация
 

@@ -62,33 +62,42 @@ json-file логов; без `depends_on: condition: service_healthy` — litell
 ## Алиасы и fallback
 
 Публичные имена моделей — семантические классы; набор живёт в БД и не заморожен
-артефактом. Начальные значения и fallback-политика (перекрёстная, по классам):
+артефактом. Начальные значения и fallback-политика (перекрёстная, по классам).
+**Единая раскладка** на всех экземплярах с 2026-11-23 (D-001 Amendment 4):
+экземпляры различаются только тем, чьи upstream-credentials стоят в deployment'ах:
 
 | Класс | Семантика | Primary | Fallback |
 |---|---|---|---|
 | `fable` | топовая: рассуждения, анализ репо, ревью, vision | Kimi `k3.1-pro` | `opus` (GLM) |
 | `opus` | оптимальная: основная работа | GLM `glm-5.3` | `fable` (Kimi) |
-| `sonnet` | быстрая: лёгкий интерактив | GLM `glm-5.3-flash` | `swift` (Kimi) |
-| `haiku` | дешёвая: субагенты, auto, механика | GLM `glm-5.3-flash` | `swift` (Kimi) |
-| `swift` | полка: Kimi-fast, цель страховки лёгких | Kimi `k3.1-pro-highspeed` | `sonnet` (GLM) |
-| `iflex-*` | команда iflex: те же роли на своей подписке (sonnet=kimi-highspeed→glm-flash) | подписка iflex | парный `iflex-*` другого провайдера |
+| `sonnet` | быстрая: лёгкий интерактив | Kimi `k3.1-pro-highspeed` | `haiku` (GLM) |
+| `haiku` | дешёвая: субагенты, auto, механика | GLM `glm-5.3-flash` | `sonnet` (Kimi) |
+| `iflex-*` | **interim** (firebat до переработки): те же роли на подписке iflex, sonnet=kimi-highspeed→glm-flash, полка `iflex-swift` | подписка iflex | парный `iflex-*` другого провайдера |
 
 Переключение — только при ошибке **до начала ответа**; mid-stream fallback —
-именованный предел, не обещание. Клиент получает scoped virtual key (5 алиасов, вкл. swift), не
-master key.
+именованный предел, не обещание. Клиент получает scoped virtual key (4
+канонических алиаса — fallback-пары покрывают друг друга; interim-ключи iflex —
+5 имён `iflex-*`), не master key.
 
 ## Контуры развёртывания
 
 - **Локальный:** `.env` (gitignored, из `.env.example`) +
   `docker compose --env-file .env -f deploy/compose.yml up -d`; публикация
   `127.0.0.1:4000`.
-- **governetics:** проект панели с тем же шаблоном в `compose_template`; ключи — на шаге
-  Configure (`LLM_GATE_BIND` = адрес узла `10.0.0.110`, достижимый для edge); внешний
-  HTTPS — host-based маршрут g9s-edge `llm-gate.lab.governetics.ru` →
-  `reverse_proxy 10.0.0.110:4000` (нода `g9s-minipc-firebat`); прямой порт 4000 из LAN
-  отвечает by design; из интернета узел за NAT по топологии сети (не проба шлюза —
-  топологический факт). Секреты контуров независимы (у
-  каждого свой salt).
+- **governetics — экземпляр на владельца подписки** (D-001 Amendment 4; один
+  DC панели `llm-gate`, node-project на ноду, свои значения ключей на каждом):
+  - `llm-dev.lab.governetics.ru` → `reverse_proxy 10.0.0.100:4000`
+    (нода `g9s-devbox`) — **контур оператора**: канонические имена на
+    подписках оператора;
+  - `llm-gate.lab.governetics.ru` → `reverse_proxy 10.0.0.110:4000`
+    (нода `g9s-minipc-firebat`) — **контур команды iflex**; до переработки —
+    общий экземпляр с interim-именами `iflex-*` и полкой `swift` на старом
+    applied-шаблоне (панель применяет новый шаблон только явным Deploy).
+  Прямой порт 4000 из LAN отвечает by design; из интернета узлы за NAT по
+  топологии сети (не проба шлюза — топологический факт). Секреты контуров
+  независимы (у каждого свой salt). Same-name per-team на одном экземпляре —
+  Enterprise-фича LiteLLM (лицензионный гейт, чтение исходников v1.108.0) —
+  артефактом не используется.
 
 ## Подключение клиентов
 

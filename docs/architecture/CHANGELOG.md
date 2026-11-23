@@ -6,6 +6,19 @@
 
 ## 2026-11-23
 
+### Changed
+
+- Единая раскладка на всех экземплярах шлюза (канон 4 имён): `sonnet`
+  возвращён на Kimi `k3.1-pro-highspeed` (fallback `haiku` = GLM flash) —
+  осознанная отмена решения 2026-11-05 ради одинаковой раскладки; полка
+  `swift` из канона убрана (её upstream и fallback дублируют `sonnet`).
+  Policy-YAML очищена от командных имён `iflex-*`: один шаблон на все
+  экземпляры. Same-name per-team роутинг на одном экземпляре существует, но
+  Enterprise-лицензирован (`team_public_model_name`; чтение исходников
+  v1.108.0) — вместо него экземпляр на владельца подписки: контур оператора
+  на `g9s-devbox` (`llm-dev.lab.governetics.ru`), контур iflex на
+  `minipc-firebat` (Amendment 4 к D-001).
+
 ### Added
 
 - Команда `iflex`: юзеры `ymakarova-iflex`/`asorin-iflex`, deployment'ы
