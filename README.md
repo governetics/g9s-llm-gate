@@ -164,6 +164,26 @@ Fallback между провайдерами настраивается в `depl
    5 шагов через `https://llm-gate.lab.governetics.ru`: auth-negative, models, messages,
    SSE, tool_use. Для локального стека: `BASE_URL=http://127.0.0.1:4000 SMOKE_KEY=… scripts/smoke.sh`.
 
+## 4a. Тарификация, лимиты, statusline
+
+Учёт и лимиты живут на шлюзе и работают в passthrough-режиме:
+
+- **Расход по ключам/юзерам** — Admin UI → Logs/Usage (токены по каждому
+  запросу) или API `GET /key/info` (своим ключом — без админ-прав).
+- **Лимиты ключа** — `max_budget` + `budget_duration` (напр. `$50` / `30d`),
+  `tpm_limit`/`rpm_limit`; меняются в UI или `POST /key/update`. Денежные
+  бюджеты осмысленны при заданных ценах моделей (model_info →
+  `input/output_cost_per_token`; для подписочных моделей — номинальные).
+- **Команды** (teams) — свой агрегатный бюджет поверх ключей + scope моделей.
+- **Statusline Claude Code** — остаток лимита прямо в строке статуса:
+  `scripts/gate_budget.py` + `gate_budget.conf.example` (настраиваются: ключ,
+  порог покраснения, подпись). Секция settings.json:
+  `"statusLine": {"type": "command", "command": "python3 …/gate_budget.py"}`.
+
+Onboarding участника команды: свой virtual key (в команде — обычные имена
+моделей; маршрутизация на подписку команды делает шлюз), CC-профиль как в
+разделе 3, но со своим `ANTHROPIC_AUTH_TOKEN` + statusline.
+
 ## 5. Эксплуатация
 
 ### Бэкап / восстановление

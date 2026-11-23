@@ -1,0 +1,7 @@
+{
+  "base_url": "https://llm-gate.lab.governetics.ru",
+  "key_file": "~/.llm-gate/vk.key",
+  "key_env": "",
+  "warn_pct": 20,
+  "label": "gate"
+}
