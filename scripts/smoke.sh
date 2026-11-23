@@ -16,6 +16,9 @@
 #               Model aliases are interpolated into a JSON body and a grep
 #               pattern: use plain identifiers (letters, digits, -, _, [1m]),
 #               not values with quotes or backslashes.
+#   MAX_TIME    per-step curl budget in seconds (default: 60; raise it for
+#               reasoning-heavy upstreams whose tool answers run long -- a
+#               step cut mid-stream reports 000, not a gateway failure)
 #
 # Every step prints "PASS <name>" or "FAIL <name> -- <reason>"; on failure
 # a short (<=200 chars) one-line response fragment is included. Full
@@ -36,7 +39,7 @@ BASE_URL="${BASE_URL:-https://llm-gate.lab.governetics.ru}"
 BASE_URL="${BASE_URL%/}"
 MODEL="${MODEL:-opus}"
 TOOL_MODEL="${TOOL_MODEL:-fable}"
-MAX_TIME=60
+MAX_TIME="${MAX_TIME:-60}"
 FAILED=0
 
 SMOKE_TMP="$(mktemp -d)"
