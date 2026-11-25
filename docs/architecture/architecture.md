@@ -24,11 +24,11 @@ governetics (панель, Path A). Архитектура артефакта и
 
 | Компонент | Что делает |
 |---|---|
-| `litellm` (`ghcr.io/berriai/litellm:v1.108.0`) | прокси `/v1/messages` (native passthrough), Admin UI на `:4000`, virtual keys, spend tracking. `command: [--config, /app/proxy_server_config.yaml, --port, "4000"]` — без явного `--config` образ стартует с пустым model list. Healthcheck — `/health/liveliness` (без auth, без трат токенов; `/health` шлёт реальные запросы — в пробы запрещён) |
+| `litellm` (`ghcr.io/berriai/litellm:v1.108.0`) | прокси `/v1/messages` (native passthrough), Admin UI на `:4000`, virtual keys, spend tracking. `command: [--config, /etc/g9s/files/proxy_server_config.yaml, --port, "4000"]` — без явного `--config` образ стартует с пустым model list. Healthcheck — `/health/liveliness` (без auth, без трат токенов; `/health` шлёт реальные запросы — в пробы запрещён) |
 | `db` (`postgres:16.15`) | хранилище моделей (`STORE_MODEL_IN_DB: "True"`), credentials (шифруются salt key), virtual keys, spend. Named volume `db-data`; **без** host-портов — БД отвечает только в compose-сети |
-| `policy_yaml` (`configs.content`) | routing-политика: `router_settings.fallbacks` по публичным алиасам + `litellm_settings.num_retries: 2`. Доставляется как `/app/proxy_server_config.yaml`; в контенте нет `$` (compose интерполирует configs, панель стабит `${…}`). Пересоздание контейнера при изменении контента — hash-лейбл `llmgate.policy-sha256` (первые 16 hex sha256 контента; пинится тестом) |
+| `proxy_server_config.yaml` (панельный file-ключ) | routing-политика: `router_settings.fallbacks` по публичным алиасам + `litellm_settings.num_retries: 2`. Доставляется панелью per-node в `/etc/g9s/files/` (том `ro`, значение — на шаге Configure node-project'а; эталонный текст — `deploy/policy.yaml`). litellm читает файл на старте: изменение значения = Deploy + Restart. Compose `configs` и hash-лейбл ушли (D-001 Amendment 5); в тексте файла нет `$` (пинится тестом) |
 
-Ключи шаблона (`x-g9s-config`, пять; детали контракта — D-002): `LLM_GATE_BIND`
+Ключи шаблона (`x-g9s-config`: пять env-ключей + один file-ключ политики; детали контракта — D-002): `LLM_GATE_BIND`
 (адрес публикации), `LLM_GATE_PORT` (порт хоста; порт контейнера всегда 4000),
 `LLM_GATE_MASTER_KEY`, `LLM_GATE_SALT_KEY`, `LLM_GATE_POSTGRES_PASSWORD` (invisible;
 подстановка fail-loud `${KEY:?…}`). Маппинг на имена образа — через `environment:`
@@ -51,8 +51,9 @@ json-file логов; без `depends_on: condition: service_healthy` — litell
 
 - **БД / Admin UI** — модели (алиасы, upstream, credentials), virtual keys, бюджеты.
   Смена модели — живьём через UI, без правки YAML и рестарта.
-- **YAML шаблона** — routing-политика (fallbacks, retries) и, по мере hardening,
-  `general_settings`. С v1.103.0 YAML-ключи приоритетнее UI-правок этих областей.
+- **Файл политики узла** (панель доставляет per-node; эталон `deploy/policy.yaml` в репо) —
+  routing-политика (fallbacks, retries) и, по мере hardening, `general_settings`. С v1.103.0
+  файловые ключи приоритетнее UI-правок этих областей.
 
 Связка областей: fallbacks ссылаются на `model_name` из БД — доказано живьём
 (индуцированный отказ primary → ответ от fallback-провайдера). Следствие: переименование
@@ -63,16 +64,18 @@ json-file логов; без `depends_on: condition: service_healthy` — litell
 
 Публичные имена моделей — семантические классы; набор живёт в БД и не заморожен
 артефактом. Начальные значения и fallback-политика (перекрёстная, по классам).
-**Единая раскладка** на всех экземплярах с 2026-11-23 (D-001 Amendment 4):
+**Единая раскладка** на всех экземплярах (D-001 Amendments 4–5; 2026-11-25 лёгкие слоты
+поменялись первичными upstream'ами ради стабильности классификатора auto mode CC,
+`opus` переведён на `glm-5.4`):
 экземпляры различаются только тем, чьи upstream-credentials стоят в deployment'ах:
 
 | Класс | Семантика | Primary | Fallback |
 |---|---|---|---|
 | `fable` | топовая: рассуждения, анализ репо, ревью, vision | Kimi `k3.1-pro` | `opus` (GLM) |
-| `opus` | оптимальная: основная работа | GLM `glm-5.3` | `fable` (Kimi) |
-| `sonnet` | быстрая: лёгкий интерактив | Kimi `k3.1-pro-highspeed` | `haiku` (GLM) |
-| `haiku` | дешёвая: субагенты, auto, механика | GLM `glm-5.3-flash` | `sonnet` (Kimi) |
-| `swift` | полка: Kimi highspeed, вручную | Kimi `k3.1-pro-highspeed` | `haiku` (GLM) |
+| `opus` | оптимальная: основная работа | GLM `glm-5.4` | `fable` (Kimi) |
+| `sonnet` | лёгкий интерактив; классификатор auto mode CC (по умолчанию слота) | GLM `glm-5.3-flash` | `haiku` (Kimi) |
+| `haiku` | дешёвая: субагенты, механика | Kimi `k3.1-pro-highspeed` | `sonnet` (GLM) |
+| `swift` | полка: Kimi highspeed, вручную (только контур iflex) | Kimi `k3.1-pro-highspeed` | — (в политике пары нет) |
 
 Переключение — только при ошибке **до начала ответа**; mid-stream fallback —
 именованный предел, не обещание. Клиент получает scoped virtual key
@@ -118,6 +121,7 @@ Discovery (`CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1`) отдаёт алиа
 
 ## Тестовый слой
 
-pytest: L0 — пины шаблона (ключи/инварианты/hash-лейбл/gitignore); L1 — рендер
+pytest: L0 — пины шаблона (ключи/file-ключ политики/инварианты/gitignore,
+эталон `deploy/policy.yaml`); L1 — рендер
 `docker compose config` (fail-loud подстановки); L2 — панельный парсер governetics
 (прогоняется при `GOVERNETICS_ROOT`, без него skip). Реестр прогонов — сессии impl.

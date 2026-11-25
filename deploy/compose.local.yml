@@ -1,0 +1,17 @@
+# Local-contour override. The panel delivers the routing policy as a file
+# (/etc/g9s/files/proxy_server_config.yaml, the `files` key of the header);
+# locally the same reference text is bind-mounted from the repo. Use together
+# with the template:
+#
+#   docker compose --env-file .env -f deploy/compose.yml -f deploy/compose.local.yml up -d
+#
+# Never paste this file into the panel: a bind mount is refused there by
+# design (the template's no-bind-mount gate).
+services:
+  litellm:
+    volumes:
+      - type: bind
+        source: ./policy.yaml
+        target: /etc/g9s/files/proxy_server_config.yaml
+        read_only: true
+        bind: {create_host_path: false}

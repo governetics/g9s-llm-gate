@@ -16,8 +16,9 @@ invisible`, никакой ручной записи каналов достав
 
 ## Решение
 
-**(а) `x-g9s-config` — пять ключей**, по одному consumer-сервису на назначение
-(`db` потребляет только пароль postgres):
+**(а) `x-g9s-config` — пять env-ключей и один file-ключ**, по consumer-сервисам
+на назначение (`db` потребляет только пароль postgres; добавление file-ключа —
+2026-11-25, D-001 Amendment 5):
 
 | Ключ | Consumers | Visibility |
 |---|---|---|
@@ -26,6 +27,7 @@ invisible`, никакой ручной записи каналов достав
 | `LLM_GATE_MASTER_KEY` | litellm | invisible |
 | `LLM_GATE_SALT_KEY` | litellm | invisible |
 | `LLM_GATE_POSTGRES_PASSWORD` | litellm, db | invisible |
+| `proxy_server_config.yaml` (files) | litellm | mode `0444`, required |
 
 **(б) Fail-loud подстановки.** Каждый обязательный ключ — `${KEY:?…}`: пустое значение
 (панель пропускает пустое через completeness-чек) роняет `up` с текстом `<ключ> is not
@@ -35,12 +37,14 @@ set`, а не публикует сервис на всех адресах/сл�
 панель добавляет `env_file` для своих ключей, и `env_precedence` затенил бы явный
 маппинг (`LITELLM_MASTER_KEY`, `LITELLM_SALT_KEY`, `DATABASE_URL`, `STORE_MODEL_IN_DB`).
 
-**(г) Policy-YAML — `configs.content`.** Routing-политика живёт в теле шаблона:
-самодостаточно в обоих контурах, без файлов рядом. В контенте нет `$` — compose
-интерполирует содержимое configs, а панель стабит `${…}` до парсинга. Compose не
-пересоздаёт контейнер при изменении только контента конфига — пересоздание обеспечивает
-hash-лейбл `llmgate.policy-sha256` (16 hex sha256 контента; соответствие пинится
-тестом).
+**(г) Routing-политика — панельный file-ключ (D-001 Amendment 5).** *(пункт в редакции Amendment 2026-11-25; исходно — `configs.content` в теле шаблона, см. секцию Amendment ниже)* Шаблон объявляет
+file-ключ `proxy_server_config.yaml` (группа `files`); панель доставляет значение
+каждому узлу в `/etc/g9s/files/` (том `ro`, auto-mount по consumers — deploy.py
+панели), `command` контейнера читает этот путь. Значение required: узел без него
+не проходит Deploy. В тексте файла нет `$`. Изменение значения: Configure → Deploy →
+**Restart** (файл доставляется живьём, litellm перечитывает его только на старте).
+Локальный контур подключает тот же текст bind-mount'ом через `deploy/compose.local.yml`
+(в шаблон его нельзя: панель запрещает bind-mount'ы).
 
 **(д) `db` без host-портов** — БД отвечает только в compose-сети; наружу смотрит
 исключительно litellm на `BIND:PORT`.
@@ -80,7 +84,7 @@ litellm, стартующий раньше готовности db, падает
 
 ## Открытое
 
-- Изменение policy-YAML через панель (redeploy с новым hash-лейблом) — приёмка фазы 3.
+- ~~Изменение policy-YAML через панель (redeploy с новым hash-лейблом) — приёмка фазы 3.~~ **CLOSED 2026-11-25** — механизм hash-лейбла упразднён (Amendment ниже); изменение политики = Configure (файл) → Deploy → Restart, выполнено в фазе 5 на обоих контурах.
 - Backup/restore живьём на ноде (`DB_CONTAINER` панели отличается от локального
   умолчания) — приёмка фазы 3.
 - L2-прогон панельного парсера требует checkout governetics (`GOVERNETICS_ROOT`); без
@@ -98,3 +102,15 @@ litellm, стартующий раньше готовности db, падает
 - [architecture.md](../architecture.md) — as-is; [README](../../../README.md) — шаги
   Configure и ключи remote-контура.
 - [CHANGELOG](../CHANGELOG.md), 2026-11-04; plan/impl-сессии 261104-01 (дом проекта).
+
+
+## Amendment (2026-11-25): file-ключ политики
+
+Контракт расширен (D-001 Amendment 5): группа `files` заголовка объявляет
+`proxy_server_config.yaml` (consumers `[litellm]`, mode `0444`, required);
+панель доставляет значение per-node в `/etc/g9s/files/`, `command` контейнера
+читает этот путь. Пункт (г) переписан: `configs.content` и hash-лейбл
+`llmgate.policy-sha256` ушли из шаблона (compose `configs` больше не
+используется — правило content-only сохраняется как запрет на возврат).
+Изменение значения — Configure → Deploy → Restart. Локальный контур —
+`deploy/compose.local.yml` (bind-mount вне шаблона).

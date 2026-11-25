@@ -12,8 +12,8 @@
 
 | ID | Дата | Статус | Решение (1 строка) | Амендменты | Файл |
 |---|---|---|---|---|---|
-| D-001 | 2026-11-04 | ACTIVE | Артефакт: единый compose-шаблон (litellm+db), native `/v1/messages` passthrough, владение конфигом БД/UI vs YAML (dual-write запрещён) | Amendment 1 (2026-11-04): алиасы → роли CC; Amendment 2 (2026-11-05): sonnet → GLM flash, полка swift; Amendment 3 (2026-11-23): команды на своих подписках; Amendment 4 (2026-11-23): единая раскладка, экземпляр на владельца подписки | [D-001-artefakt-llm-gate.md](D-001-artefakt-llm-gate.md) |
-| D-002 | 2026-11-04 | ACTIVE | Контракт governetics: x-g9s-config 5 ключей, fail-loud `${KEY:?}`, invisible-секреты, content-only configs, db без host-портов, restart вместо depends_on | — | [D-002-kontrakt-governetics.md](D-002-kontrakt-governetics.md) |
+| D-001 | 2026-11-04 | ACTIVE | Артефакт: единый compose-шаблон (litellm+db), native `/v1/messages` passthrough, владение конфигом БД/UI vs YAML (dual-write запрещён) | Amendment 1 (2026-11-04): алиасы → роли CC; Amendment 2 (2026-11-05): sonnet → GLM flash, полка swift; Amendment 3 (2026-11-23): команды на своих подписках; Amendment 4 (2026-11-23): единая раскладка, экземпляр на владельца подписки; Amendment 5 (2026-11-25): политика — доставляемый файл, свап лёгких слотов, glm-5.4 | [D-001-artefakt-llm-gate.md](D-001-artefakt-llm-gate.md) |
+| D-002 | 2026-11-04 | ACTIVE | Контракт governetics: x-g9s-config 5 env-ключей + file-ключ политики, fail-loud `${KEY:?}`, invisible-секреты, db без host-портов, restart вместо depends_on | Amendment 2026-11-25: file-ключ политики вместо `configs.content` | [D-002-kontrakt-governetics.md](D-002-kontrakt-governetics.md) |
 
 ## Superseded / dropped
 

@@ -48,10 +48,12 @@ governetics, приёмка/hardening/доки); фаза 4 — миграция
    - master key **обязан** начинаться с `sk-` (см. «Известные пределы»);
    - пароль postgres — только буквы/цифры: значение встраивается в `DATABASE_URL`.
 
-2. `docker compose --env-file .env -f deploy/compose.yml up -d`
+2. `docker compose --env-file .env -f deploy/compose.yml -f deploy/compose.local.yml up -d`
 
    `--env-file` обязателен: compose ищет `.env` в каталоге `deploy/`, а не в корне
-   репозитория.
+   репозитория. Второй `-f` — локальный override: routing-политику на панели
+   доставляет файл-ключ, локально тот же текст ([deploy/policy.yaml](deploy/policy.yaml))
+   подключается bind-mount'ом (в шаблон его нельзя — панель запрещает bind-mount'ы).
 
 3. Дождаться liveliness (первый старт гоняет Prisma-миграции, `start_period` до 300 с;
    строки «errors» в логе контейнера — имя миграции, не ошибка):
@@ -73,19 +75,24 @@ Models → Add Model. Ключ провайдера вводится **в опр
 — z.ai). Публичное имя (`model_name`) —
 алиас-класс; upstream-модель — серверный ID провайдера:
 
-**Раскладка единая для всех экземпляров** (решение оператора 2026-11-23, D-001
-Amendment 4): экземпляры различаются только тем, **чьи** ключи провайдеров стоят в
-deployment'ах. GLM — тяжёлый кодинг (`opus`) и лёгкий слот `haiku`; Kimi —
-рассуждения (`fable`) и лёгкий `sonnet` (highspeed; осознанный возврат после
-таймаутов 2026-11-05 — компенсация живым cross-fallback на GLM flash). Полка
-`swift` сохранена как ручной класс (Kimi highspeed) на обоих контурах.
+**Раскладка единая для всех экземпляров** (D-001 Amendments 4–5): экземпляры
+различаются только тем, **чьи** ключи провайдеров стоят в deployment'ах. GLM —
+тяжёлый кодинг (`opus`) и интерактивно-критичный лёгкий слот `sonnet` (на нём
+по умолчанию ездит классификатор auto mode Claude Code — потому он на
+стабильном GLM flash, решение 2026-11-25); Kimi — рассуждения (`fable`) и
+фоновый `haiku` (субагенты/механика; fallback на GLM flash). Полка `swift`
+(Kimi highspeed, вручную) есть только на контуре iflex.
 
 | Алиас | Upstream (`model`) | `api_base` | Режим |
 |---|---|---|---|
 | `fable` | `k3.1-pro` | `https://api.kimi.ai/coding/` | passthrough |
-| `opus` | `glm-5.3` | `https://api.z.ai/api/anthropic` | passthrough |
-| `sonnet` | `k3.1-pro-highspeed` | `https://api.kimi.ai/coding/` | passthrough |
-| `haiku` | `glm-5.3-flash` | `https://api.z.ai/api/anthropic` | passthrough |
+| `opus` | `glm-5.4` | `https://api.z.ai/api/anthropic` | passthrough |
+| `sonnet` | `glm-5.3-flash` | `https://api.z.ai/api/anthropic` | passthrough |
+| `haiku` | `k3.1-pro-highspeed` | `https://api.kimi.ai/coding/` | passthrough |
+
+> Лёгкий GLM-класс «5.4-flash» не существует (проверено живьём 2026-11-25 на
+> обеих подписках: `glm-5.4` — 200, `-flash/-air/-mini/-turbo` — 1211 Unknown
+> Model); flash-слот остаётся на `glm-5.3-flash`.
 
 Режим passthrough: `supported_endpoints: ["/v1/messages"]` — шлюз переводит
 Anthropic-протокол как есть, без конвертации. Вписывается в поле **Model Info (JSON)**
@@ -115,7 +122,7 @@ v1.108.0), поэтому используется экземпляр на ко�
 "ANTHROPIC_DEFAULT_HAIKU_MODEL": "haiku",
 "ANTHROPIC_DEFAULT_OPUS_MODEL": "opus",
 "CLAUDE_CODE_SUBAGENT_MODEL": "haiku",
-"CLAUDE_CODE_AUTO_MODE_MODEL": "haiku"
+"CLAUDE_CODE_AUTO_MODE_MODEL": "sonnet"
 ```
 
 Upstream'ы — те же, что в таблице канона выше (полка `swift` = Kimi
@@ -134,15 +141,24 @@ Virtual Keys → Create Key: scope — все 4 канонических али�
 
 ### Классы и fallback
 
-Fallback между провайдерами настраивается в `deploy/compose.yml` (`configs.policy_yaml`)
-и ссылается на алиасы:
+Fallback между провайдерами — routing-политика шлюза. Её эталонный текст —
+[deploy/policy.yaml](deploy/policy.yaml); на каждую ноду панель доставляет его
+**файлом** (`proxy_server_config.yaml`, file-ключ шаблона → `/etc/g9s/files/`,
+задаётся на шаге Configure node-project). Изменение: правка значения файла →
+Deploy → **Restart** проекта (litellm читает файл только на старте). Политика
+ссылается на алиасы:
 
 | Класс | Primary | Fallback |
 |---|---|---|
-| `fable` (рассуждения/анализ/ревью) | Kimi `k3.1-pro` | `opus` = GLM `glm-5.3` |
-| `opus` (основная работа) | GLM `glm-5.3` | `fable` = Kimi `k3.1-pro` |
-| `sonnet` (быстрый лёгкий контур) | Kimi `k3.1-pro-highspeed` | `haiku` = GLM `glm-5.3-flash` |
-| `haiku` (субагенты/auto/механика) | GLM `glm-5.3-flash` | `sonnet` = Kimi `k3.1-pro-highspeed` |
+| `fable` (рассуждения/анализ/ревью) | Kimi `k3.1-pro` | `opus` = GLM `glm-5.4` |
+| `opus` (основная работа) | GLM `glm-5.4` | `fable` = Kimi `k3.1-pro` |
+| `sonnet` (лёгкий интерактив, классификатор auto mode CC) | GLM `glm-5.3-flash` | `haiku` = Kimi `k3.1-pro-highspeed` |
+| `haiku` (субагенты/механика) | Kimi `k3.1-pro-highspeed` | `sonnet` = GLM `glm-5.3-flash` |
+
+> **Классификатор auto mode CC** по умолчанию резолвится через слот sonnet
+> (`ANTHROPIC_DEFAULT_SONNET_MODEL`), а `CLAUDE_CODE_AUTO_MODE_MODEL` требует
+> полный model ID (алиас игнорируется) — поэтому стабильность классификатора
+> держится раскладкой слота `sonnet`, а не этой переменной.
 
 ## 3. Подключение Claude Code
 
@@ -158,7 +174,7 @@ Fallback между провайдерами настраивается в `depl
 | `ANTHROPIC_DEFAULT_SONNET_MODEL` | `sonnet` |
 | `ANTHROPIC_DEFAULT_HAIKU_MODEL` | `haiku` |
 | `CLAUDE_CODE_SUBAGENT_MODEL` | `haiku` (важные ревью — явный `--model fable`) |
-| `CLAUDE_CODE_AUTO_MODE_MODEL` | `haiku` (клиентский классификатор) |
+| `CLAUDE_CODE_AUTO_MODE_MODEL` | `sonnet` (клиентский классификатор; фактически он резолвится через слот sonnet — переменная требует полный model ID, алиас может игнорироваться) |
 | `CLAUDE_CODE_AUTO_COMPACT_WINDOW` / `CLAUDE_CODE_MAX_CONTEXT_TOKENS` | `1000000` — 1M-контекст |
 | `CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY` | `1` — пикер `/model` покажет алиасы (CC ≥ 2.1.129) |
 
@@ -183,12 +199,15 @@ Fallback между провайдерами настраивается в `depl
 
 1. Проект панели: `compose_template` = содержимое [deploy/compose.yml](deploy/compose.yml)
    целиком (`project_type` docker-compose).
-2. Шаг Configure — 5 ключей:
+2. Шаг Configure — 5 env-ключей и 1 файл:
    - `LLM_GATE_BIND` — адрес узла, достижимый для edge (`10.0.0.110`; host-loopback из
      edge недостижим);
    - `LLM_GATE_PORT` — `4000`;
    - `LLM_GATE_MASTER_KEY` / `LLM_GATE_SALT_KEY` / `LLM_GATE_POSTGRES_PASSWORD` —
-     секреты remote-контура, **отдельные** от локального (у каждого контура свой salt).
+     секреты remote-контура, **отдельные** от локального (у каждого контура свой salt);
+   - файл `proxy_server_config.yaml` — routing-политика узла: содержимое
+     [deploy/policy.yaml](deploy/policy.yaml) (required: без него Deploy отказывает;
+     панель доставляет файл в контейнер как `/etc/g9s/files/proxy_server_config.yaml`).
 3. Маршрут g9s-edge (настраивает оператор edge): host-based
    `llm-gate.lab.governetics.ru` → `reverse_proxy 10.0.0.110:4000` (не path-based).
 4. Deploy → `converged`. Холодный старт с Prisma-миграциями переживается самим деплоем.
@@ -211,7 +230,7 @@ Fallback между провайдерами настраивается в `depl
 Тот же DC `llm-gate` панели (его `namespaces` расширены на `home` — namespace
 ноды devbox), отдельный node-project на ноде: BIND `10.0.0.100`, PORT `4000`,
 **свои** master/salt/postgres (секреты контура devbox; у каждого экземпляра свой
-salt). Edge-маршрут `llm-dev.lab.governetics.ru` →
+salt), свой экземпляр файла политики (Configure, `files`). Edge-маршрут `llm-dev.lab.governetics.ru` →
 `reverse_proxy 10.0.0.100:4000` (host-based). После Deploy — раздел 2 против
 нового экземпляра: своя пустая БД, 4 канонические модели с ключами подписок
 оператора, свои virtual keys. Обновление шаблона в DC **не** переключает
@@ -266,17 +285,19 @@ scripts/restore.sh <файл.sql.gz> --yes     # restore ПОВЕРХ живой
   (на старте гоняются Prisma-миграции). Никакого `latest`.
 - **«Снять с узла» в панели** удаляет named volume — это потеря всей БД (модели, ключи,
   spend). Бэкап заранее.
-- **Смена модели/перевода upstream** — через UI живьём, без правки YAML. Но:
-  - fallback-политика YAML ссылается на **имена алиасов**: переименование алиаса = правка
-    `policy_yaml` в шаблоне + пересчёт hash-лейбла `llmgate.policy-sha256`, иначе
-    fallback молча теряет цель. Пересчёт (первые 16 hex sha256 контента) — прогон
-    `python3 -m pytest tests` подскажет ожидаемое значение ассерта; либо посчитать:
-
-    ```sh
-    python3 -c "import hashlib,yaml,pathlib; c=yaml.safe_load(pathlib.Path('deploy/compose.yml').read_text())['configs']['policy_yaml']['content']; print(hashlib.sha256(c.encode()).hexdigest()[:16])"
-    ```
+- **Смена модели/перевода upstream** — через UI живьём, без правки файла. Но:
+  - fallback-политика (файл узла) ссылается на **имена алиасов**: переименование алиаса =
+    правка значения `proxy_server_config.yaml` в Configure **каждого** node-project'а
+    (эталон — [deploy/policy.yaml](deploy/policy.yaml), коммит в репо), иначе fallback
+    молча теряет цель;
   - UI-переименование алиаса обновляет scope существующих virtual keys; API-путь
     delete+new — нет (ключ остаётся на старом имени → 403; лечится `/key/update`).
+- **Смена routing-политики** — значение файла `proxy_server_config.yaml` в Configure
+  node-project'а → Deploy → **Restart** проекта (litellm читает файл только на
+  старте; доставка живая, перечитывание — нет). Эталон и контракт (`tests`) — в репо.
+- **Классификатор auto mode Claude Code** резолвится через sonnet-слот: держите
+  `sonnet` на стабильном лёгком upstream (сейчас GLM flash); `CLAUDE_CODE_AUTO_MODE_MODEL`
+  требует полный model ID и алиас игнорирует.
 
 ### Проверки разработки
 

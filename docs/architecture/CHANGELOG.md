@@ -4,6 +4,21 @@
 записи: дата + Added/Changed/Removed по смыслу изменения архитектуры. Одно
 изменение — одна запись; ссылка на решение (`D-NNN`), если оно есть.
 
+## 2026-11-25
+
+### Changed
+
+- Routing-политика переведена из запечённого в шаблон `configs.policy_yaml` в
+  **per-node файл панели** (`proxy_server_config.yaml`, группа `files`
+  заголовка; эталон `deploy/policy.yaml`, локальный override
+  `deploy/compose.local.yml`); hash-лейбл ушёл, изменение значения =
+  Deploy + Restart (Amendment 5 к D-001; контракт панели — D-002).
+- Лёгкие слоты поменяны первичными upstream'ами: `sonnet` = GLM flash → Kimi
+  highspeed, `haiku` = Kimi highspeed → GLM flash — классификатор auto mode
+  Claude Code (по умолчанию едет на sonnet-слоте) больше не зависит от фаз
+  таймаутов Kimi (Amendment 5 к D-001). `opus` → GLM `glm-5.4` (проверено
+  живьём на обеих подписках; лёгкого «5.4-flash» у провайдера нет).
+
 ## 2026-11-23
 
 ### Changed

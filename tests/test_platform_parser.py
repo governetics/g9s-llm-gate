@@ -67,3 +67,9 @@ def test_platform_accepts_header_and_gates():
     assert parsed["keys"]["envs"]["LLM_GATE_POSTGRES_PASSWORD"]["visibility"] == "invisible"
     assert sorted(parsed["keys"]["envs"]["LLM_GATE_POSTGRES_PASSWORD"]["consumers"]) == [
         "db", "litellm"]
+    # The files group: the panel parses it with the same key properties and
+    # mounts /etc/g9s/files/ into the consumer service (deploy.py rules).
+    assert sorted(parsed["keys"]["files"]) == sorted(declared["files"])
+    policy_key = parsed["keys"]["files"]["proxy_server_config.yaml"]
+    assert policy_key["consumers"] == ["litellm"]
+    assert policy_key["presence"] == "required"  # no policy-less Deploy

@@ -1,0 +1,27 @@
+# Routing policy of one gate instance -- the reference text of the
+# `proxy_server_config.yaml` file key the panel delivers to /etc/g9s/files/
+# on each node (Configure step of the node project). Models, credentials and
+# keys are owned by the Admin UI / database and never appear here; the
+# aliases below are the public names created in the UI.
+#
+# A changed value is delivered live (directory mount) but litellm reads the
+# file at start only: after a change, Deploy (or Configure) and then Restart
+# the project. Keep the file free of the dollar sign (a template-field
+# convention the panel enforces; pinned by tests/test_template_pins.py).
+#
+# Cross-provider fallbacks by public alias (role -> fallback role, always the
+# other provider: a full provider outage keeps both the heavy and the light
+# slot served, by the other side's models). The layout is the same on every
+# instance of the gate: instances differ only by whose upstream credentials
+# their deployments hold (per-team same-name routing on one instance is a
+# licensed feature this artifact does not use -- see D-001 Amendment 4).
+# Switching happens only on a failure before the response starts; mid-stream
+# fallback is a named limit.
+router_settings:
+  fallbacks:
+    - fable: [opus]
+    - opus: [fable]
+    - sonnet: [haiku]
+    - haiku: [sonnet]
+litellm_settings:
+  num_retries: 2

@@ -47,6 +47,29 @@ def test_values_cover_every_required_key():
     assert sorted(VALUES) == sorted(required_keys())
 
 
+LOCAL_OVERRIDE = TEMPLATE.with_name("compose.local.yml")
+
+
+def test_local_override_mounts_the_policy_file(tmp_path):
+    """The panel delivers the policy file; the local contour bind-mounts the
+    same reference text through a local-only override (bind mounts are refused
+    by the panel, so the override never enters the template)."""
+    env_file = tmp_path / "keys.env"
+    env_file.write_text("".join("%s=%s\n" % kv for kv in VALUES.items()))
+    env = {"PATH": os.environ["PATH"],
+           "HOME": os.environ.get("HOME", "/tmp")}
+    out = subprocess.run(
+        ["docker", "compose", "-p", "llmgate-test", "-f", str(TEMPLATE),
+         "-f", str(LOCAL_OVERRIDE), "--env-file", str(env_file), "config", "--format", "json"],
+        capture_output=True, text=True, env=env, timeout=60,
+    )
+    assert out.returncode == 0, out.stderr
+    litellm = json.loads(out.stdout)["services"]["litellm"]
+    mounts = {(v["source"], v["target"]) for v in litellm["volumes"]}
+    assert (str(TEMPLATE.with_name("policy.yaml")),
+            "/etc/g9s/files/proxy_server_config.yaml") in mounts
+
+
 def test_services_render(tmp_path):
     out = compose(VALUES, tmp_path, "--services")
     assert out.returncode == 0, out.stderr
@@ -75,9 +98,10 @@ def test_rendered_model(tmp_path):
     assert db["environment"]["POSTGRES_PASSWORD"] == "testonlypg123"
     assert db["environment"]["POSTGRES_USER"] == "llmgate"
     assert db["environment"]["POSTGRES_DB"] == "llmgate"
-    # The policy content passes through compose un-interpolated and intact.
-    assert (model["configs"]["policy_yaml"]["content"]
-            == load_template()["configs"]["policy_yaml"]["content"])
+    # The policy is not compose config anymore: it is a panel-delivered file
+    # the command reads by its delivered path (pinned by the template tests).
+    assert "configs" not in model
+    assert litellm["command"][:2] == ["--config", "/etc/g9s/files/proxy_server_config.yaml"]
 
 
 @pytest.mark.parametrize("key", required_keys())

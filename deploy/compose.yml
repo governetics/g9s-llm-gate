@@ -12,10 +12,10 @@
 #   - every declared key has a consumer service, and every substitution
 #     stands for a declared key;
 #   - provider model definitions and credentials are NOT here: they live in
-#     the database via the Admin UI (dual-write is forbidden). This file
-#     carries routing policy only; no `$` inside the policy content below --
-#     compose interpolates config content, and the panel stubs ${...} before
-#     parsing the template;
+#     the database via the Admin UI (dual-write is forbidden). The routing
+#     policy is a per-node file the panel delivers to /etc/g9s/files/ (the
+#     `files` key below); its reference text is deploy/policy.yaml, pasted
+#     into the Configure step of each node project;
 #   - every service: healthcheck, restart: unless-stopped, json-file log
 #     rotation;
 #   - no depends_on with condition: service_healthy (litellm starting ahead
@@ -40,40 +40,24 @@ x-g9s-config:
     # Postgres password. URL-safe charset only (letters/digits): the value is
     # embedded verbatim into DATABASE_URL, special characters break the DSN.
     LLM_GATE_POSTGRES_PASSWORD: {consumers: [litellm, db], visibility: invisible}
-
-configs:
-  # Routing policy only: fallbacks by public alias and retry count. Model
-  # definitions, provider credentials and keys are owned by the database /
-  # Admin UI and never appear here; the aliases below refer to model names
-  # created in the UI.
-  policy_yaml:
-    content: |
-      # Cross-provider fallbacks by public alias (role -> fallback role,
-      # always the other provider: a full provider outage keeps both the
-      # heavy and the light slot served, by the other side's models).
-      # The layout is the same on every instance of the gate: instances
-      # differ only by whose upstream credentials their deployments hold
-      # (per-team same-name routing on one instance is a licensed feature
-      # this artifact does not use -- see D-001 Amendment 4).
-      # Switching happens only on a failure before the response starts;
-      # mid-stream fallback is a named limit.
-      router_settings:
-        fallbacks:
-          - fable: [opus]
-          - opus: [fable]
-          - sonnet: [haiku]
-          - haiku: [sonnet]
-      litellm_settings:
-        num_retries: 2
+  files:
+    # Routing policy of this node: fallbacks by public alias and retry count,
+    # read by litellm at start (a changed value needs a restart). Model
+    # definitions, provider credentials and keys are owned by the database /
+    # Admin UI and never appear here. Reference text: deploy/policy.yaml.
+    # Required: a node without it is refused at Deploy (no policy-less start).
+    proxy_server_config.yaml: {consumers: [litellm], mode: "0444"}
 
 services:
   litellm:
     # Pinned minor tag: Prisma migrations run on start, an update is a
     # pin-change -> backup -> verify procedure, never a rolling latest.
     image: ghcr.io/berriai/litellm:v1.108.0
-    # Without an explicit --config the image starts with an empty model list
-    # and every request fails "Invalid model name" (measured on v1.108.0).
-    command: [--config, /app/proxy_server_config.yaml, --port, "4000"]
+    # The policy file is delivered by the panel (the `files` key above mounts
+    # /etc/g9s/files/ into this service). Without an explicit --config the
+    # image starts with an empty model list and every request fails "Invalid
+    # model name" (measured on v1.108.0).
+    command: [--config, /etc/g9s/files/proxy_server_config.yaml, --port, "4000"]
     ports:
       - "${LLM_GATE_BIND:?LLM_GATE_BIND is not set}:${LLM_GATE_PORT:?LLM_GATE_PORT is not set}:4000"
     environment:
@@ -96,15 +80,6 @@ services:
       retries: 3
       # First start runs Prisma migrations against an empty database.
       start_period: 300s
-    configs:
-      - source: policy_yaml
-        target: /app/proxy_server_config.yaml
-        mode: 0444
-    labels:
-      # Compose does not recreate a container when only config content
-      # changes; a label does. Keep it = sha256 of the policy content,
-      # first 16 hex digits (tests/test_template_pins.py fails otherwise).
-      llmgate.policy-sha256: "df9d157adaa9061d"
     restart: unless-stopped
     logging:
       driver: json-file

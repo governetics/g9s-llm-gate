@@ -1,4 +1,4 @@
-"""Shared helpers: load the template and parse the policy content it carries."""
+"""Shared helpers: load the template and the policy file it declares."""
 import pathlib
 
 import pytest
@@ -6,6 +6,7 @@ import yaml
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 TEMPLATE = ROOT / "deploy" / "compose.yml"
+POLICY = ROOT / "deploy" / "policy.yaml"
 
 
 def load_template():
@@ -13,8 +14,9 @@ def load_template():
 
 
 def policy_source():
-    """The policy YAML exactly as the template ships it (raw text)."""
-    return load_template()["configs"]["policy_yaml"]["content"]
+    """The policy YAML exactly as the operator pastes it into the panel
+    (the reference text of the delivered `proxy_server_config.yaml`)."""
+    return POLICY.read_text(encoding="utf-8")
 
 
 @pytest.fixture(scope="session")

@@ -14,10 +14,12 @@ exploration — дата установки: 2026-11-04
   passthrough — спайк 261104-01 фаза 0), встроенный Admin UI, модели в
   PostgreSQL 16.15 (`STORE_MODEL_IN_DB`).
 - Docker Compose — единый шаблон `deploy/compose.yml` (local + governetics).
-- Алиасы (роли CC-слотов; единая раскладка на всех экземплярах с 2026-11-23 —
-  D-001 Amendment 4): `fable`=Kimi k3.1-pro · `opus`=GLM glm-5.3 ·
-  `sonnet`=Kimi k3.1-pro-highspeed · `haiku`=GLM glm-5.3-flash; fallback
-  перекрёстный (`fable`↔`opus`, `sonnet`↔`haiku`). Экземпляр на владельца
+- Алиасы (роли CC-слотов; единая раскладка на всех экземплярах — D-001
+  Amendments 4–5): `fable`=Kimi k3.1-pro · `opus`=GLM glm-5.4 ·
+  `sonnet`=GLM glm-5.3-flash · `haiku`=Kimi k3.1-pro-highspeed (свап лёгких
+  слотов 2026-11-25 — классификатор auto mode CC на sonnet-слоте); fallback
+  перекрёстный (`fable`↔`opus`, `sonnet`↔`haiku`).
+  Routing-политика — per-node файл панели (эталон `deploy/policy.yaml`). Экземпляр на владельца
   подписки: devbox = оператор, firebat = iflex (канонические имена на обоих).
 - Тесты: pytest + PyYAML (L0 пины → L1 compose config → L2 парсер панели).
 
@@ -30,6 +32,7 @@ exploration — дата установки: 2026-11-04
 | 2 | Деплой под governetics (upstream+route, Preview → узел → Deploy → `converged`), remote smoke через HTTPS. **Gate до Deploy:** живой прогон `tests/test_platform_parser.py` с `GOVERNETICS_ROOT` — панельные гейты (env_precedence, bind_mounts, tag-pattern на оба семейства тегов) локальным прогоном не покрыты (skip без checkout'а). Решение оператора 2026-11-04: держать здесь, не в backlog | DONE (gate закрыт: живой прогон с `GOVERNETICS_ROOT` поймал падение на document order — фикс `sorted()`-сравнения, `a12cfd9`; скрипты smoke/backup/restore + пины, ревью R6, 40 passed; Deploy `converged`, холодный старт с Prisma пережит самим деплоем; edge-маршрут `llm-gate.lab.governetics.ru` (BIND 10.0.0.110); 4/4 модели + VK `claude-code` через remote-master; remote smoke 5/5 через HTTPS; A8-цикл round-trip restore в probe-БД ×2 (пустая + поверх непустой). Перенесено в фазу 3: policy-YAML через панель, backup/restore живьём на ноде) | 2026-11-04 |
 | 3 | Приёмка (CC-сессии через оба контура, индуцированный fallback), hardening (DB-admin, disable_env_credential_login, admin_only), доки (README-оператор, architecture.md, ADR D-001/D-002, release-config) | DONE по доступному объёму 2026-11-04: индуцированный fallback на контуре узла (битый ключ top → 200 от glm-5.3); доки — README-оператор, architecture as-is, D-001/D-002, CHANGELOG (0172ef8; ревью фокус + reader-test); release-config в доме. A9 переопределён решением оператора: стенд — master-логин сохранён, DB-admin `gateadmin` создан (UI Reset password; read-API юзера — баг v1.108.0, юзер функционален). Остатки в эксплуатации: полные CC-сессии, policy-YAML-изменение через панель, backup/restore на ноде, release-тег v0.1.0 (verify готов) | 2026-11-04 |
 | 4 | Миграция на экземпляр-на-владельца-подписки (D-001 A4): подъём контура оператора на `g9s-devbox` (`llm-dev.lab.governetics.ru`) → проверка → переключение upstream оператора → переработка firebat под iflex (канонические имена на токенах iflex, снятие подписок оператора) | DONE (2026-11-23): devbox-контур converged + smoke 5/5 + VK; оператор переключён; firebat переработан — 5 `iflex-*` переименованы в канон (params/credentials сохранены), core-deployments/юзер `operator`/команда `core` и оба VK оператора удалены, Deploy единого шаблона `4692f737…` converged, пробы канона ключом iflex 200/`pong` (вкл. sonnet=kimi-highspeed), smoke 5/5 ключом iflex. Посторонний `opus` (paas/v4) удалён до переработки | 2026-11-23 |
+| 5 | Политика как доставляемый файл панели + свап лёгких слотов + glm-5.4 (D-001 A5): file-ключ в шаблоне, тесты, DC панели, Configure (files) + Deploy на обоих контурах | DONE (2026-11-25: 40 passed + L1-пин override; devbox и firebat converged на шаблоне `7be5ad5f…`, контейнеры читают `/etc/g9s/files/proxy_server_config.yaml`; smoke 5/5 на обоих; свап и glm-5.4 проверены пробами 200/`pong`) | 2026-11-25 |
 
 > Статусы: `TODO` / `IN PROGRESS` / `DONE (YYYY-MM-DD)`. Одна фаза — один
 > vertical-slice; каждая закрывается docs-before-commit + real-env валидацией

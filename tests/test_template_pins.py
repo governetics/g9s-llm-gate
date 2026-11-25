@@ -5,7 +5,6 @@ they are not behavioural. Behaviour is checked by `docker compose config`
 (test_compose_config.py), the platform parser (test_platform_parser.py) and
 the phase 1+ live probes.
 """
-import hashlib
 import re
 import subprocess
 
@@ -28,12 +27,16 @@ def body_text():
     """Template text without the x-g9s-config header block."""
     text = TEMPLATE.read_text(encoding="utf-8")
     start = text.index("x-g9s-config:")
-    end = text.index("\nconfigs:", start)
+    end = text.index("\nservices:", start)
     return text[:start] + text[end:]
 
 
 def env_keys(template):
     return template["x-g9s-config"]["envs"]
+
+
+def file_keys(template):
+    return template["x-g9s-config"]["files"]
 
 
 def test_every_service_has_healthcheck_restart_and_log_rotation(template):
@@ -89,9 +92,16 @@ def test_every_declared_key_has_consumer_and_is_used(template):
     for key, props in env_keys(template).items():
         consumers = props.get("consumers") or []
         assert consumers and set(consumers) <= services, key
-    # Completeness both ways: every declared key is substituted in the body,
-    # every substitution stands for a declared key.
+    # Completeness both ways: every declared env key is substituted in the
+    # body, every substitution stands for a declared env key.
     assert used == set(env_keys(template))
+    # File keys are not substituted: each consumer service reads the delivered
+    # path (/etc/g9s/files/<key>) -- pinned as a literal in its command.
+    for key, props in file_keys(template).items():
+        consumers = props.get("consumers") or []
+        assert consumers and set(consumers) <= services, key
+        for service in consumers:
+            assert "/etc/g9s/files/" + key in template["services"][service]["command"], (key, service)
 
 
 def test_required_keys_only_in_fail_loud_form(template):
@@ -138,13 +148,12 @@ def test_image_pins(template):
 
 def test_litellm_command_pins_config(template):
     svc = template["services"]["litellm"]
-    # The image starts with an empty model list without an explicit --config.
-    assert svc["command"] == ["--config", "/app/proxy_server_config.yaml",
+    # The policy is a panel-delivered file (the `files` key of the header),
+    # read by its delivered path; without an explicit --config the image
+    # starts with an empty model list.
+    assert svc["command"] == ["--config", "/etc/g9s/files/proxy_server_config.yaml",
                               "--port", "4000"]
-    assert svc["configs"] == [
-        {"source": "policy_yaml", "target": "/app/proxy_server_config.yaml",
-         "mode": 0o444},
-    ]
+    assert "configs" not in svc  # no compose-config copy of the policy
 
 
 def test_litellm_publication_pin(template):
@@ -184,27 +193,32 @@ def test_db_healthcheck_pg_isready(template):
     assert "-U" in cmd and "-d" in cmd
 
 
-def test_configs_are_content_only(template):
-    for cname, cfg in template.get("configs", {}).items():
-        assert set(cfg) == {"content"}, cname  # no file: / environment: sources
+def test_policy_is_a_delivered_file_not_a_compose_config(template):
+    """The routing policy travels as a per-node file key of the panel (each
+    node project gets its own value at Configure); compose `configs` would
+    bake one text into the artifact for every node."""
+    assert "configs" not in template
     assert "secrets" not in template
+    files = file_keys(template)
+    assert set(files) == {"proxy_server_config.yaml"}
+    assert files["proxy_server_config.yaml"]["consumers"] == ["litellm"]
+    assert files["proxy_server_config.yaml"]["mode"] == "0444"
     for name, svc in template["services"].items():
         for field in ("env_file", "secrets", "build", "extends", "devices"):
             assert field not in svc, (name, field)
 
 
-def test_policy_hash_label_tracks_content(template):
-    """A policy change must recreate the container: compose ignores config
-    content changes on its own."""
-    content = template["configs"]["policy_yaml"]["content"]
-    label = template["services"]["litellm"]["labels"]["llmgate.policy-sha256"]
-    assert label == hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
+def test_policy_hash_label_retired(template):
+    """The sha256 label existed to recreate the container on a compose-config
+    content change; a delivered file needs an explicit Restart instead
+    (runbook), and a stale label would claim otherwise."""
+    assert "llmgate.policy-sha256" not in (template["services"]["litellm"].get("labels") or {})
 
 
-def test_policy_content_has_no_dollar(template):
-    # compose interpolates config content; the panel stubs ${...} before
-    # parsing the template
-    assert "$" not in template["configs"]["policy_yaml"]["content"]
+def test_policy_content_has_no_dollar():
+    # The panel stubs ${...} before parsing template fields; the delivered
+    # file must stay free of `$` so no line of it is ever taken for one.
+    assert "$" not in policy_source()
 
 
 def test_only_braced_substitutions_in_body():
